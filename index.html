@@ -41,9 +41,13 @@
           <h2>还能再救一下</h2>
           <p class="dialog-score">本局得分 <strong id="reviveScore">0</strong></p>
           <p class="revive-hint">清掉警戒线以上的水果，接着玩</p>
-          <div class="dialog-actions">
+          <div class="revive-choices">
+            <button class="btn btn-revive" id="reviveBtn" type="button">🪙 用 1 枚 · 清顶上 1 颗</button>
+            <button class="btn btn-revive-wide" id="reviveWideBtn" type="button">🪙 用 2 枚 · 清顶上 3 颗</button>
+          </div>
+          <p class="revive-wide-hint" id="reviveWideHint" hidden></p>
+          <div class="dialog-actions dialog-actions-single">
             <button class="btn" id="giveUpBtn" type="button">不了，结束吧</button>
-            <button class="btn btn-revive" id="reviveBtn" type="button">🪙 用一枚复活币</button>
           </div>
           <p class="dialog-hint" id="reviveLeft">还剩 1 枚</p>
         </div>
@@ -54,6 +58,30 @@
           <h2 id="overTitle">游戏结束</h2>
           <p class="dialog-score">本局得分 <strong id="finalScore">0</strong></p>
           <p class="dialog-best">最高分 <span id="finalBest">0</span></p>
+
+          <!-- 本局亮点：五项统计，两列紧凑排版 -->
+          <div class="run-stats" id="runStats">
+            <div class="run-stat">
+              <span class="run-stat-label">最高连锁</span>
+              <strong class="run-stat-value" id="statCascade">×1</strong>
+            </div>
+            <div class="run-stat">
+              <span class="run-stat-label">最高等级</span>
+              <strong class="run-stat-value" id="statTier">葡萄</strong>
+            </div>
+            <div class="run-stat">
+              <span class="run-stat-label">顶级清场</span>
+              <strong class="run-stat-value" id="statTop">0</strong>
+            </div>
+            <div class="run-stat">
+              <span class="run-stat-label">危险救回</span>
+              <strong class="run-stat-value" id="statRecovery">0</strong>
+            </div>
+            <div class="run-stat">
+              <span class="run-stat-label">用掉复活币</span>
+              <strong class="run-stat-value" id="statRevive">0</strong>
+            </div>
+          </div>
 
           <div class="submit-box" id="submitBox">
             <p class="submit-msg" id="submitMsg">正在结算…</p>

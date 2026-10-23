@@ -36,6 +36,30 @@
   const REVIVE_STEP = 2000;  // 每累计多少分，发一枚复活币
   const MERGE_PAD = 0.8;     // 合成判定的接触容差（px）
 
+  /* —— 连锁（cascade）——
+     规则：普通合成会产出一颗新水果；只有当「这一颗新水果」在 CASCADE_WINDOW 秒内
+     又被另一次合成吃掉，且两次合成之间玩家没有投放过，才算一次连续连锁。
+     第一次合成 = 连锁长度 1；之后每接上一次 +1；不相干的合成重新从 1 开始。 */
+  const CASCADE_WINDOW = 0.6;      // 秒：新水果必须在这段时间内再次被合成
+  const CASCADE_BONUS_STEP = 5;    // 每多一级连锁奖励的分
+  const CASCADE_BONUS_MAX = 5;     // 奖励最多按 5 级算（即 +25）
+  const CASCADE_TEXT_MAX = 5;      // 飘字最多显示 ×5+，统计里保留真实值
+
+  /* —— 危险线救回 ——
+     同一颗水果在警戒线上方累计满 RECOVERY_MIN_TIME 秒后才「够格」算救回；
+     之后它掉回线下、或被合成掉，就记一次救回（每颗只记一次，每局最多 RECOVERY_CAP 次）。 */
+  const RECOVERY_MIN_TIME = 0.5;   // 秒
+  const RECOVERY_BONUS = 30;       // 每次救回的分
+  const RECOVERY_CAP = 3;          // 每局最多记几次
+
+  /* —— 投放方向微调（可选手感增强）——
+     瞄准仍然只由 aimX 决定；这里只是松手时额外给一点横向速度，
+     上限刻意压得很小，不足以替代瞄准。 */
+  const FINESSE_ENABLED = true;    // 想关掉整个功能就改 false
+  const FINESSE_MAX = 60;          // 横向冲量上限（px/s）
+  const FINESSE_KEY_STEP = 20;     // 键盘每按一次加减多少
+  const FINESSE_TOUCH_WINDOW = 120; // ms：用拖动最后这段时间的横向速度
+
   /* —— Q 弹手感 —— */
   const RESTITUTION      = 0.38;  // 球与球之间的弹性
   const WALL_RESTITUTION = 0.45;  // 撞墙 / 撞地面的弹性
@@ -84,6 +108,7 @@
 
   const BEST_KEY = 'danaiwa.best.v1';
   const MUTE_KEY = 'danaiwa.mute.v1';
+  const DISCOVERY_KEY = 'danaiwa.discovery.v1';   // 图鉴：已解锁过的等级
 
   /* ---------------------------------------------------------
    *  DOM
@@ -235,7 +260,33 @@
     flash: 0,
     revives: 0,        // 本局还剩几枚复活币（重开清零）
     reviveGiven: 0,    // 本局已经发放过几次（用来判断跨过新的 2000 分）
-    freeze: 0          // 命中定格剩余秒数
+    freeze: 0,         // 命中定格剩余秒数
+
+    /* —— 连锁状态（每局重置）——
+       cascadeLen  当前这条连锁的长度（0 = 没有进行中的连锁）
+       cascadeId   每开一条新连锁就 +1，用来认「是不是同一颗新水果」
+       cascadeBall 上一次合成产出的那颗新水果（下一环必须是它被吃掉）
+       cascadeTime 产出它的时刻（秒，游戏内时钟）
+       cascadeX/Y  连锁结束时要显示飘字的位置 */
+    cascadeLen: 0,
+    cascadeId: 0,
+    cascadeBall: null,
+    cascadeTime: 0,
+    cascadeX: 0,
+    cascadeY: 0,
+
+    /* —— 局内统计（每局重置，只由玩法事件驱动）—— */
+    stats: {
+      maxCascade: 0,     // 最高连锁长度
+      maxTier: 0,        // 合到过的最高等级（含投放的起始等级）
+      topClears: 0,      // 两只神奶蛙一起炸掉的次数
+      recoveries: 0,     // 危险线救回次数
+      revivesUsed: 0     // 用掉复活币的次数
+    },
+
+    /* —— 投放方向微调 —— */
+    finesse: 0,        // 当前横向冲量（px/s），-60..60
+    clock: 0           // 游戏内累计秒数（连锁窗口用它，不用真实时间，测试可控）
   };
 
   /* ---------------------------------------------------------
@@ -526,10 +577,16 @@
       const my = (a.y + b.y) * 0.5;
       const tier = a.tier;
 
+      /* 被合成掉的这两颗，如果之前在警戒线上方攒够过 0.5 秒，
+         那它们现在「被合走了」也算一次救回（同一颗只记一次）。 */
+      creditRecovery(a);
+      creditRecovery(b);
+
       if (tier >= MAX_TIER) {
         /* 两只神奶蛙 → 一起炸掉，拿一大笔奖励分（外加一枚复活币）。
            注意：它同时清掉了两块最大的水果，是后期唯一的泄压阀，不能取消。
-           分数的飘字不用 addScore 那个普通的，下面单独给了「大字 +500」。 */
+           分数的飘字不用 addScore 那个普通的，下面单独给了「大字 +500」。
+           它不产出新水果，所以会结束当前连锁，也不计入连锁长度。 */
         addScore(MAX_BONUS);
         burst(mx, my, MAX_TIER, 90, 560);
         burst(mx, my, MAX_TIER - 2, 42, 340);
@@ -543,6 +600,8 @@
           state.revives++;
           paintRevives(true);
         }
+        state.stats.topClears++;              // 顶级清场统计
+        settleCascade();                      // 不产水果 → 连锁到此为止
       } else {
         const nt = tier + 1;
         const nb = makeBall(mx, my, nt, (a.vx + b.vx) * 0.5, (a.vy + b.vy) * 0.5 - 60);
@@ -560,6 +619,10 @@
         Sound.merge(nt);
         haptic(6 + nt);
         if (nt === MAX_TIER) state.flash = 1;
+
+        noteTier(nt);        // 最高等级统计（含投放起始等级）
+        noteCascadeMerge(nb); // 连锁判定
+        unlockTier(nt);       // 图鉴：首次合出就解锁
       }
     }
 
@@ -642,6 +705,159 @@
     grantRevives();
   }
 
+  /* 只加分数，不走「每 2000 分发复活币」那条路。
+     连锁奖励和危险线救回都用它 —— 这两笔钱不该加速攒币。 */
+  function addBonusScore(n, x, y, text) {
+    state.score += n;
+    if (state.score > state.best) {
+      state.best = state.score;
+      localStorage.setItem(BEST_KEY, String(state.best));
+      bestEl.textContent = state.best;
+    }
+    scoreEl.textContent = state.score;
+    bump(scoreEl);
+    if (x !== undefined) {
+      state.floats.push({ x, y, text: text || ('+' + n), life: 1.2 });
+    }
+    /* 刻意不调用 grantRevives() */
+  }
+
+  /* ---------------------------------------------------------
+   *  连锁（cascade）与局内统计
+   *
+   *  判定规则（与 PLAN 一致）：
+   *   · 普通合成产出新水果 → 若当前没有进行中的连锁，开一条长度 1 的新连锁；
+   *     若正在连锁，则这条合成必须「吃掉的是上一条连锁刚产出的那颗水果」才算接上。
+   *   · 接上的条件：新水果在 CASCADE_WINDOW 秒内被合成，且期间玩家没投放过。
+   *   · 最高级（两只神奶蛙）不产出水果，所以它会**结束**当前连锁，也不计入连锁长度，
+   *     但仍然累加「顶级清场」统计。
+   *   · 玩家一旦投放，当前连锁立即结算。
+   * ------------------------------------------------------- */
+
+  /* 把一条进行中的连锁结算掉：更新最高纪录、飘字、发奖励 */
+  function settleCascade() {
+    const len = state.cascadeLen;
+    if (len <= 0) return;
+    state.cascadeLen = 0;
+    state.cascadeBall = null;
+
+    if (len > state.stats.maxCascade) state.stats.maxCascade = len;
+    if (len < 2) return;                      // 长度 1 没有连锁奖励
+
+    /* 奖励 = min(len-1, 5) × 5，最多 +25；走不攒币的加分通道 */
+    const steps = Math.min(len - 1, CASCADE_BONUS_MAX);
+    const bonus = steps * CASCADE_BONUS_STEP;
+    const text = '×' + Math.min(len, CASCADE_TEXT_MAX) + (len > CASCADE_TEXT_MAX ? '+' : '');
+    /* 连续连锁时飘字会叠在一起，给一点轻微错位，读起来不糊成一团 */
+    const jitter = (Math.random() - 0.5) * 26;
+    state.floats.push({
+      x: state.cascadeX + jitter, y: state.cascadeY - 46,
+      text: text + ' 连锁', life: 1.5, chain: true
+    });
+    if (bonus > 0) {
+      addBonusScore(bonus, state.cascadeX + jitter, state.cascadeY - 6, '+' + bonus);
+    }
+    Sound.bonus();
+    haptic(30);
+  }
+
+  /* 一次普通合成产出了 nb（新水果）。判断它是接上连锁还是另起一条。 */
+  function noteCascadeMerge(nb) {
+    const now = state.clock;
+    /* 上一条连锁产出的那颗水果，是不是刚好被这次合成吃掉了？ */
+    const continues = state.cascadeLen > 0
+      && state.cascadeBall !== null
+      && state.cascadeBall.dead === true          // 它确实被合成了
+      && (now - state.cascadeTime) <= CASCADE_WINDOW;
+
+    if (continues) {
+      state.cascadeLen++;
+    } else {
+      /* 接不上：先把上一条结算掉，再开一条新的 */
+      settleCascade();
+      state.cascadeLen = 1;
+    }
+
+    state.cascadeBall = nb;
+    state.cascadeTime = now;
+    state.cascadeX = nb.x;
+    state.cascadeY = nb.y;
+
+    if (state.cascadeLen > state.stats.maxCascade) {
+      state.stats.maxCascade = state.cascadeLen;
+    }
+  }
+
+  /* 投放会打断连锁 */
+  function breakCascade() {
+    if (state.cascadeLen > 0) settleCascade();
+  }
+
+  /* 记录「合到过这一级」：投放的起始等级也算 */
+  function noteTier(tier) {
+    if (tier > state.stats.maxTier) state.stats.maxTier = tier;
+  }
+
+  /* ---------------------------------------------------------
+   *  合成图鉴（本地持久化，纯外观）
+   * ------------------------------------------------------- */
+
+  let discovered = loadDiscovery();
+
+  /* 重新从本地读一遍图鉴。
+     正常游玩用不到（内存里的就是最新的），但两个场景需要：
+      · 另一个标签页改了图鉴；
+      · 自检脚本要在一套干净的存储上重跑断言。 */
+  function reloadDiscovery() {
+    discovered = loadDiscovery();
+    drawChain();
+    return discovered;
+  }
+
+  function loadDiscovery() {
+    const empty = [];
+    try {
+      const raw = localStorage.getItem(DISCOVERY_KEY);
+      if (!raw) return empty;
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return empty;
+      const out = [];
+      for (let i = 0; i < arr.length; i++) {
+        const t = Number(arr[i]);
+        /* 只收 0..MAX_TIER 的整数，去重，坏数据直接忽略 */
+        if (isFinite(t) && t >= 0 && t <= MAX_TIER && Math.floor(t) === t && out.indexOf(t) < 0) {
+          out.push(t);
+        }
+      }
+      return out;
+    } catch (e) {
+      return empty;      // localStorage 不可用 / JSON 坏了：当作空图鉴，不影响玩
+    }
+  }
+
+  function saveDiscovery() {
+    try {
+      localStorage.setItem(DISCOVERY_KEY, JSON.stringify(discovered));
+    } catch (e) { /* 存不了就算了，不影响本局 */ }
+  }
+
+  /* 某个等级是否已解锁（初始投放的 0 级视为天然可见） */
+  function isDiscovered(tier) {
+    if (tier <= 0) return true;
+    return discovered.indexOf(tier) >= 0;
+  }
+
+  /* 合出一个等级时解锁它。返回 true 表示这是首次解锁。 */
+  function unlockTier(tier) {
+    if (tier < 0 || tier > MAX_TIER) return false;
+    if (discovered.indexOf(tier) >= 0) return false;
+    discovered.push(tier);
+    saveDiscovery();
+    drawChain();          // 立刻重画合成表，剪影变实体
+    return true;
+  }
+
+
   function bump(el) {
     el.classList.remove('bump');
     void el.offsetWidth;
@@ -668,8 +884,15 @@
     const [lo, hi] = aimLimit(tier);
     const x = clamp(state.aimX, lo, hi);
 
-    const ball = makeBall(x, DROP_Y, tier, 0, 130);
+    /* 投放会打断连锁：先把上一条结算掉，再让新水果下去 */
+    breakCascade();
+
+    /* 横向冲量：只在这一刻生效，不影响 aimX，也不会推动已经落下的水果 */
+    const ix = FINESSE_ENABLED ? clamp(state.finesse, -FINESSE_MAX, FINESSE_MAX) : 0;
+    const ball = makeBall(x, DROP_Y, tier, ix, 130);
     state.balls.push(ball);
+
+    noteTier(tier);            // 投放的起始等级也算进「最高等级」
 
     state.ready = false;
     state.cooldown = DROP_MS / 1000;
@@ -681,8 +904,22 @@
   }
 
   /* ---------------------------------------------------------
-   *  判负
+   *  判负 + 危险线救回
    * ------------------------------------------------------- */
+
+  /* 记一次「救回」：这颗水果在警戒线上方累计够 0.5 秒，然后掉回线下或被合成掉。
+     每颗只记一次；每局最多 RECOVERY_CAP 次；奖励走不攒币的加分通道。 */
+  function creditRecovery(b) {
+    if (!b || b.recoveryDone) return false;
+    if ((b.dangerPeak || 0) < RECOVERY_MIN_TIME) return false;   // 只是路过，不算
+    if (state.stats.recoveries >= RECOVERY_CAP) return false;    // 到上限了
+    b.recoveryDone = true;
+    state.stats.recoveries++;
+    addBonusScore(RECOVERY_BONUS, b.x, b.y - b.r - 12, '救回 +' + RECOVERY_BONUS);
+    Sound.merge(4);
+    haptic(12);
+    return true;
+  }
 
   function checkGameOver(dt) {
     let danger = false;
@@ -697,23 +934,47 @@
            被弹起来、正在飞过线的不算，免得误判 */
         if (b.vx * b.vx + b.vy * b.vy < REST_SPEED2) {
           b.overTime += dt;
+          /* 记住这颗在线上方攒到过的最大时长：救回判定看的是这个值，
+             而不是「掉回线下那一刻还剩多少」 */
+          if (b.overTime > (b.dangerPeak || 0)) b.dangerPeak = b.overTime;
           if (b.overTime > OVER_LIMIT) { gameOver(); return; }
         } else {
           b.overTime = Math.max(0, b.overTime - dt * 2);
         }
       } else {
         /* 回到线下方 → 按 2 倍速倒扣，所以长时间待在线上方才会攒起来 */
+        const wasAbove = b.overTime > 0;
         b.overTime = Math.max(0, b.overTime - dt * 2);
-        if (b.overTime > 0) danger = true;
+        if (wasAbove) {
+          danger = true;
+          /* 攒够过 0.5 秒才算是「化险为夷」 */
+          if ((b.dangerPeak || 0) >= RECOVERY_MIN_TIME) creditRecovery(b);
+        }
       }
     }
     state.danger = danger;
+  }
+
+  /* 结算面板上的五项局内统计（两列紧凑排版） */
+  function paintStats() {
+    const s = state.stats;
+    setText('statCascade', '×' + Math.max(1, s.maxCascade));
+    setText('statTier', s.maxTier >= 0 ? FRUITS[s.maxTier].name : '—');
+    setText('statTop', s.topClears);
+    setText('statRecovery', s.recoveries);
+    setText('statRevive', s.revivesUsed);
+  }
+
+  function setText(id, v) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(v);
   }
 
   /* 正式结算：弹结算窗 + 把成绩交给排行榜 */
   function settle() {
     if (revivePromptEl) revivePromptEl.hidden = true;
     if (overPanelEl) overPanelEl.hidden = false;
+    paintStats();                    // 先把这一局的统计刷上去
     if (overlayEl) overlayEl.classList.add('show');
     /* 交给排行榜模块（没加载也不影响） */
     if (window.DanaiwaBoard && window.DanaiwaBoard.onGameOver) {
@@ -721,13 +982,50 @@
     }
   }
 
-  /* 越线那一屏：有复活币就先问一句 */
+  /* 越线那一屏：有复活币就先问一句，并把两档按钮按余额摆好 */
   function askRevive() {
     if (reviveScoreEl) reviveScoreEl.textContent = state.score;
     if (reviveLeftEl) reviveLeftEl.textContent = '还剩 ' + state.revives + ' 枚';
+    paintReviveChoices();
     if (revivePromptEl) revivePromptEl.hidden = false;
     if (overPanelEl) overPanelEl.hidden = true;
     if (overlayEl) overlayEl.classList.add('show');
+  }
+
+  /* 两档复活的按钮状态：
+     · 普通档（1 枚）：余额够就能点
+     · 大范围档（2 枚）：余额不足时禁用，并说明还差几枚 */
+  function paintReviveChoices() {
+    const normalBtn = document.getElementById('reviveBtn');
+    const wideBtn = document.getElementById('reviveWideBtn');
+    const canNormal = state.revives >= REVIVE_COST_NORMAL;
+    const canWide = state.revives >= REVIVE_COST_WIDE;
+
+    if (normalBtn) {
+      normalBtn.disabled = !canNormal;
+      normalBtn.textContent = '🪙 用 ' + REVIVE_COST_NORMAL + ' 枚 · 清顶上 1 颗';
+    }
+    if (wideBtn) {
+      wideBtn.disabled = !canWide;
+      wideBtn.textContent = '🪙 用 ' + REVIVE_COST_WIDE + ' 枚 · 清顶上 3 颗';
+      if (!canWide) {
+        const need = REVIVE_COST_WIDE - state.revives;
+        wideBtn.title = '还差 ' + need + ' 枚复活币（每 ' + REVIVE_STEP + ' 分攒一枚）';
+      } else {
+        wideBtn.removeAttribute('title');
+      }
+    }
+    /* 余额不足 2 枚时给一句人话解释 */
+    const wideHint = document.getElementById('reviveWideHint');
+    if (wideHint) {
+      if (canWide) {
+        wideHint.hidden = true;
+      } else {
+        wideHint.hidden = false;
+        wideHint.textContent = '大范围救援要 ' + REVIVE_COST_WIDE + ' 枚，还差 '
+          + (REVIVE_COST_WIDE - state.revives) + ' 枚';
+      }
+    }
   }
 
   function gameOver() {
@@ -739,29 +1037,61 @@
     settle();
   }
 
-  /* 复活：消除最顶上那颗，再把仍压在警戒线以上的清掉（只清一颗的话会立刻再输），
-     然后接着玩。返回 false 表示当前不能复活。 */
-  function revive() {
-    if (!state.over || state.revives <= 0) return false;
+  /* 复活：两档。
+     普通档（1 枚）：清掉最顶上那颗 + 所有还压在警戒线以上的水果。
+     大范围档（2 枚）：清掉最顶上三颗 + 所有还压在警戒线以上的水果。
+     两种都用「按上边缘从高到低排序后取前 N 颗」+「其余越线的一并清掉」实现，
+     同一颗水果即使同时满足两个条件也只清一次。返回 false 表示当前不能复活。 */
+  const REVIVE_COST_NORMAL = 1;
+  const REVIVE_COST_WIDE = 2;
+  const REVIVE_WIDE_TOP = 3;
 
-    /* 1) 找最顶上的：按「上边缘」比，最小的最靠上 */
-    let top = -1;
-    let topEdge = Infinity;
+  /* 按「上边缘」从高到低排好的存活水果下标 */
+  function topFirstOrder() {
+    const idx = [];
+    for (let i = 0; i < state.balls.length; i++) {
+      if (!state.balls[i].dead) idx.push(i);
+    }
+    idx.sort((i, j) => (state.balls[i].y - state.balls[i].r) - (state.balls[j].y - state.balls[j].r));
+    return idx;
+  }
+
+  /* 执行一次清场：清掉最上面 topN 颗，再把仍越线的全部清掉。
+     用 Set 去重，保证同一颗只清一次。 */
+  function clearForRevive(topN) {
+    const order = topFirstOrder();
+    const kill = new Set();
+
+    for (let k = 0; k < order.length && k < topN; k++) kill.add(state.balls[order[k]]);
+
     for (let i = 0; i < state.balls.length; i++) {
       const b = state.balls[i];
       if (b.dead) continue;
-      const edge = b.y - b.r;
-      if (edge < topEdge) { topEdge = edge; top = i; }
+      if (b.y - b.r < DANGER_Y + 6) kill.add(b);
     }
-    if (top >= 0) state.balls.splice(top, 1);
 
-    /* 2) 还压在警戒线以上的，一并清掉 */
-    state.balls = state.balls.filter((b) => !b.dead && (b.y - b.r) >= DANGER_Y + 6);
+    if (kill.size) state.balls = state.balls.filter((b) => !b.dead && !kill.has(b));
+    return kill.size;
+  }
+
+  /* mode: 'normal'（默认，1 枚）| 'wide'（2 枚） */
+  function revive(mode) {
+    const wide = mode === 'wide';
+    const cost = wide ? REVIVE_COST_WIDE : REVIVE_COST_NORMAL;
+
+    if (!state.over) return false;
+    if (state.revives < cost) return false;
+
+    clearForRevive(wide ? REVIVE_WIDE_TOP : 1);
 
     /* 越线计时清零，给玩家一个反应窗口 */
-    for (let i = 0; i < state.balls.length; i++) state.balls[i].overTime = 0;
+    for (let i = 0; i < state.balls.length; i++) {
+      state.balls[i].overTime = 0;
+      state.balls[i].dangerPeak = 0;   // 救回之后重新计
+    }
 
-    state.revives--;
+    state.revives -= cost;
+    state.stats.revivesUsed++;         // 用掉一次记一次，不按清掉的水果数算
     state.over = false;
     state.danger = false;
     state.ready = true;
@@ -788,6 +1118,24 @@
     state.revives = 0;        // 复活币只在本局有效，重开清零
     state.reviveGiven = 0;
     state.freeze = 0;
+
+    /* 连锁状态清零 */
+    state.cascadeLen = 0;
+    state.cascadeBall = null;
+    state.cascadeTime = 0;
+    state.cascadeX = 0;
+    state.cascadeY = 0;
+    state.clock = 0;
+
+    /* 局内统计清零 */
+    state.stats.maxCascade = 0;
+    state.stats.maxTier = 0;
+    state.stats.topClears = 0;
+    state.stats.recoveries = 0;
+    state.stats.revivesUsed = 0;
+
+    state.finesse = 0;
+
     state.pending = pickSpawnTier();
     state.next = pickSpawnTier(state.pending);
     if (overlayEl) overlayEl.classList.remove('show');
@@ -797,6 +1145,8 @@
     scoreEl.textContent = '0';
     bestEl.textContent = state.best;
     drawNext();
+    drawChain();              // 图鉴剪影跟着重画
+    paintStats();
     Sound.ensure();
   }
 
@@ -1032,6 +1382,42 @@
     if (!ready) ctx.globalAlpha = 0.4;
     drawFruit(ctx, x, DROP_Y + bob, r, tier, 0, 1);
     ctx.restore();
+
+    /* 方向微调指示：只在有冲量时出现，一个小箭头 + 强度条，别抢瞄准的视觉重点 */
+    drawFinesseCue(x, DROP_Y + bob, r);
+  }
+
+  /* 松手会往哪边偏：一个小箭头，越长表示冲量越大 */
+  function drawFinesseCue(x, y, r) {
+    const f = FINESSE_ENABLED ? state.finesse : 0;
+    if (!f || Math.abs(f) < 1) return;
+
+    const dir = f > 0 ? 1 : -1;
+    const k = Math.min(1, Math.abs(f) / FINESSE_MAX);   // 0..1
+    const len = r * (0.5 + k * 0.9);
+    const cy = y + r + 12;
+
+    ctx.save();
+    ctx.globalAlpha = 0.35 + k * 0.4;
+    ctx.strokeStyle = '#f4623a';
+    ctx.fillStyle = '#f4623a';
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(x - dir * r * 0.25, cy);
+    ctx.lineTo(x + dir * len, cy);
+    ctx.stroke();
+
+    /* 箭头 */
+    const tipX = x + dir * len;
+    ctx.beginPath();
+    ctx.moveTo(tipX, cy);
+    ctx.lineTo(tipX - dir * 6, cy - 4);
+    ctx.lineTo(tipX - dir * 6, cy + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   function drawEffects(dt) {
@@ -1057,17 +1443,20 @@
     for (let i = state.floats.length - 1; i >= 0; i--) {
       const f = state.floats[i];
       const big = !!f.big;
-      f.y -= (big ? 24 : 46) * dt;
-      f.life -= dt * (big ? 0.55 : 1.05);
+      const chain = !!f.chain;          // 连锁飘字：介于普通与大字之间的中间档
+      f.y -= (big ? 24 : chain ? 32 : 46) * dt;
+      f.life -= dt * (big ? 0.55 : chain ? 0.8 : 1.05);
       if (f.life <= 0) { state.floats.splice(i, 1); continue; }
       ctx.globalAlpha = Math.min(1, f.life * 1.4);
       ctx.font = big
         ? '900 40px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif'
-        : '700 20px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-      ctx.lineWidth = big ? 9 : 4;
+        : chain
+          ? '800 26px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif'
+          : '700 20px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+      ctx.lineWidth = big ? 9 : chain ? 6 : 4;
       ctx.strokeStyle = 'rgba(255,255,255,.95)';
       ctx.strokeText(f.text, f.x, f.y);
-      ctx.fillStyle = big ? '#e8342f' : '#f4623a';
+      ctx.fillStyle = big ? '#e8342f' : chain ? '#f04a12' : '#f4623a';
       ctx.fillText(f.text, f.x, f.y);
     }
     ctx.globalAlpha = 1;
@@ -1107,7 +1496,8 @@
     drawFruit(nextCtx, w / 2, h / 2, r * k, tier, 0, 1);
   }
 
-  /* 面板中的“合成表” */
+  /* 面板中的“合成表”。
+     没解锁过的等级画成剪影（纯色轮廓），解锁过的画正常贴图。 */
   function drawChain() {
     const cw = chainCanvas.width;
     const ch = chainCanvas.height;
@@ -1120,7 +1510,11 @@
 
     for (let i = 0; i < FRUITS.length; i++) {
       const x = slot * (i + 0.5);
-      drawFruit(chainCtx, x, cy, r, i, 0, 1);
+      if (isDiscovered(i)) {
+        drawFruit(chainCtx, x, cy, r, i, 0, 1);
+      } else {
+        drawSilhouette(chainCtx, x, cy, r);
+      }
       if (i < FRUITS.length - 1) {
         chainCtx.save();
         chainCtx.globalAlpha = 0.45;
@@ -1132,6 +1526,26 @@
         chainCtx.restore();
       }
     }
+  }
+
+  /* 未解锁等级的剪影：一个淡淡的圆 + 问号，不泄露具体是什么水果 */
+  function drawSilhouette(c, x, y, r) {
+    c.save();
+    c.globalAlpha = 0.9;
+    c.beginPath();
+    c.arc(x, y, r, 0, Math.PI * 2);
+    c.fillStyle = 'rgba(150, 116, 84, .16)';
+    c.fill();
+    c.lineWidth = Math.max(1, r * 0.1);
+    c.strokeStyle = 'rgba(150, 116, 84, .34)';
+    c.stroke();
+    c.globalAlpha = 0.55;
+    c.fillStyle = '#9c7c5c';
+    c.font = '700 ' + Math.round(r * 1.05) + 'px system-ui, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('?', x, y + r * 0.06);
+    c.restore();
   }
 
   /* ---------------------------------------------------------
@@ -1165,6 +1579,13 @@
     if (state.freeze > 0) { state.freeze = Math.max(0, state.freeze - dt); return; }
 
     if (state.over) return;          // 结束后冻结棋盘（粒子特效仍在 render 里继续）
+
+    state.clock += dt;               // 游戏内时钟（连锁窗口用它，测试可控）
+
+    /* 连锁窗口超时：到点就把这条连锁结算掉 */
+    if (state.cascadeLen > 0 && (state.clock - state.cascadeTime) > CASCADE_WINDOW) {
+      settleCascade();
+    }
 
     if (!state.ready) {
       state.cooldown -= dt;
@@ -1208,13 +1629,44 @@
   }
 
   /* 触屏是「拖动瞄准、松手投放」——手指不会挡住落点，也方便微调；
-     鼠标保持「移动瞄准、按下即投」的桌面手感。 */
+     鼠标保持「移动瞄准、按下即投」的桌面手感。
+
+     方向微调：触屏用拖动最后 FINESSE_TOUCH_WINDOW 毫秒的横向速度，
+     换算成一点点横向冲量；鼠标/键盘用 Shift+← / Shift+→ 单独调节。
+     瞄准位置永远只由 aimX 决定，冲量不会反过来改瞄准。 */
   let touchAiming = false;
+
+  /* 记录拖动轨迹，只保留最后 120ms 用得上的一小段 */
+  const touchTrack = [];        // [{ t, x }]
+
+  function trackTouch(x) {
+    const now = performance.now();
+    touchTrack.push({ t: now, x });
+    /* 丢掉过老的采样 */
+    while (touchTrack.length && now - touchTrack[0].t > FINESSE_TOUCH_WINDOW) {
+      touchTrack.shift();
+    }
+  }
+
+  /* 由拖动轨迹算出横向速度（px/s），并夹到 ±FINESSE_MAX */
+  function finesseFromTrack() {
+    if (!FINESSE_ENABLED) return 0;
+    if (touchTrack.length < 2) return 0;
+    const first = touchTrack[0];
+    const last = touchTrack[touchTrack.length - 1];
+    const dtMs = last.t - first.t;
+    if (dtMs < 16) return 0;                  // 太短，说明没在甩，别乱加
+    const vx = ((last.x - first.x) / dtMs) * 1000;
+    if (!isFinite(vx)) return 0;
+    if (Math.abs(vx) < 120) return 0;         // 慢慢挪不算甩动
+    return clamp(vx, -FINESSE_MAX, FINESSE_MAX);
+  }
 
   stage.addEventListener('pointermove', (e) => {
     if (state.over) return;
     if (e.pointerType === 'touch' && !touchAiming) return;
     moveAim(pointerToX(e.clientX));
+    if (e.pointerType === 'touch') trackTouch(pointerToX(e.clientX));
   });
 
   stage.addEventListener('pointerdown', (e) => {
@@ -1223,6 +1675,8 @@
     moveAim(pointerToX(e.clientX));
     if (e.pointerType === 'touch') {
       touchAiming = true;
+      touchTrack.length = 0;
+      trackTouch(pointerToX(e.clientX));
       /* 手指滑出棋盘也能收到 pointerup */
       if (stage.setPointerCapture) {
         try { stage.setPointerCapture(e.pointerId); } catch (err) { /* 忽略 */ }
@@ -1238,10 +1692,18 @@
     touchAiming = false;
     if (state.over) return;
     moveAim(pointerToX(e.clientX));
+    trackTouch(pointerToX(e.clientX));
+    state.finesse = finesseFromTrack();       // 松手这一下才把冲量算进去
     tryDrop();
+    state.finesse = 0;
+    touchTrack.length = 0;
   });
 
-  stage.addEventListener('pointercancel', () => { touchAiming = false; });
+  stage.addEventListener('pointercancel', () => {
+    touchAiming = false;
+    touchTrack.length = 0;
+    state.finesse = 0;
+  });
 
   stage.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -1255,6 +1717,14 @@
 
   window.addEventListener('keydown', (e) => {
     if (isTyping(e)) return;
+
+    /* Shift + ←/→：只调方向微调，不动瞄准位置 */
+    if (FINESSE_ENABLED && e.shiftKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+      const dir = e.code === 'ArrowLeft' ? -1 : 1;
+      state.finesse = clamp(state.finesse + dir * FINESSE_KEY_STEP, -FINESSE_MAX, FINESSE_MAX);
+      e.preventDefault();
+      return;
+    }
 
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
       state.aimX = clamp(state.aimX - 14, WALL, W);
@@ -1367,8 +1837,10 @@
 
     paintSoundBtn();
 
-    /* 越线那一屏的两个按钮 */
-    if (reviveBtn) reviveBtn.addEventListener('click', revive);
+    /* 越线那一屏的三个按钮 */
+    if (reviveBtn) reviveBtn.addEventListener('click', () => revive('normal'));
+    const reviveWideBtn = document.getElementById('reviveWideBtn');
+    if (reviveWideBtn) reviveWideBtn.addEventListener('click', () => revive('wide'));
     if (giveUpBtn) giveUpBtn.addEventListener('click', settle);
 
     drawChain();
@@ -1384,9 +1856,22 @@
     boot();
   }
 
-  /* 调试句柄（控制台可用）：__DNW__.state / .reset() / .drop() / .FRUITS / .render() */
+  /* 调试句柄（控制台可用）：__DNW__.state / .reset() / .drop() / .FRUITS / .render()
+     Stage 2 新增：settleCascade / noteCascadeMerge / creditRecovery / unlockTier /
+     isDiscovered / paintStats / clearForRevive / finesseFromTrack 等，供自检脚本直接调。 */
   window.__DNW__ = { state, reset, revive, settle, gameOver, tryDrop, stepPhysics, update, FRUITS,
-                     render, resizeCanvas, shapeOf, makeBall, paintRevives, addScore,
+                     render, resizeCanvas, shapeOf, makeBall, paintRevives, addScore, addBonusScore,
+                     settleCascade, noteCascadeMerge, breakCascade, noteTier, creditRecovery,
+                     checkGameOver, askRevive,
+                     unlockTier, isDiscovered, loadDiscovery, saveDiscovery, reloadDiscovery,
+                     paintStats,
+                     paintReviveChoices, clearForRevive, topFirstOrder, drawChain, drawSilhouette,
+                     finesseFromTrack,
                      MAX_BONUS, REVIVE_STEP,
+                     CASCADE_WINDOW, CASCADE_BONUS_STEP, CASCADE_BONUS_MAX, CASCADE_TEXT_MAX,
+                     RECOVERY_MIN_TIME, RECOVERY_BONUS, RECOVERY_CAP,
+                     FINESSE_ENABLED, FINESSE_MAX, FINESSE_KEY_STEP, FINESSE_TOUCH_WINDOW,
+                     REVIVE_COST_NORMAL, REVIVE_COST_WIDE, REVIVE_WIDE_TOP,
+                     DISCOVERY_KEY,
                      blurReady: () => !!blurImg };
 })();

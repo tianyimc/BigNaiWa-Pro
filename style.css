@@ -563,6 +563,97 @@ body {
   gap: 10px;
 }
 
+/* 只有一个按钮时（越线屏的「不了，结束吧」）占满整行 */
+.dialog-actions-single { grid-template-columns: 1fr; }
+
+/* ---------------- 越线屏：两档复活 ---------------- */
+
+.revive-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* 「用 2 枚 · 清顶上 3 颗」：琥珀色，和青绿色的普通档区分开 */
+.btn.btn-revive-wide {
+  color: #5a3200;
+  border-color: transparent;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ffd97a, #ffb020 55%, #f78f00);
+  box-shadow: 0 8px 20px rgba(244, 150, 0, .34);
+}
+.btn.btn-revive-wide:hover:not(:disabled) { box-shadow: 0 12px 26px rgba(244, 150, 0, .46); }
+
+/* 余额不够时压暗，但不要藏起来 —— 玩家得知道有这档可选 */
+.btn.btn-revive-wide:disabled,
+.btn.btn-revive:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(.35);
+}
+
+/* 差几枚的说明 */
+.revive-wide-hint {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #a4622a;
+}
+
+/* ---------------- 结算面板：本局亮点 ---------------- */
+
+.run-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 10px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 244, 226, .9);
+  box-shadow: inset 0 0 0 1px rgba(214, 160, 96, .22);
+  text-align: left;
+}
+
+.run-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.run-stat-label {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.run-stat-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: #c8601a;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 五项统计，两列排：最后一项独占一行居中，避免右侧留空 */
+.run-stat:last-child {
+  grid-column: 1 / -1;
+  justify-content: center;
+  gap: 8px;
+}
+
+@media (max-width: 380px) {
+  .revive-choices { grid-template-columns: 1fr; }
+  .run-stats { padding: 8px 10px; gap: 5px 8px; }
+  .run-stat-label { font-size: 11px; }
+  .run-stat-value { font-size: 13px; }
+}
+
 /* ---------------- 排行榜弹窗 ---------------- */
 
 .modal {
