@@ -1,7 +1,8 @@
 # PLAN.md — Pre-Execution Review & Feedback
 
-Status: review only; no plan work started. Based on inspection of commit `8998423`
-(`main`, clean tree) plus a live-site check on 2026-10-24 (Asia/Hong_Kong).
+Status: **Stage 1 executed and pushed.** Sections 1–7 were written before execution
+(based on commit `8998423`); section 8 onward records post-execution findings and the
+defects that remain open. Stage 2 has NOT been started.
 
 This file records gaps, risks, and concrete suggestions for `PLAN.md`. It does not
 replace the plan; the plan's priorities and guardrails are taken as given unless a
@@ -234,3 +235,144 @@ message, staging only that phase's files.
 5. Accept the proposed gameplay defaults in §3 (cascade window 600 ms, bonus
    score-only max +25, anti-farming cap 3, impulse ±60 px/s, revive choice 2 coins),
    or adjust before implementation?
+
+---
+
+# Part II — Post-execution findings (Stage 1 complete)
+
+Executed as commit `3c1a7bc` and pushed to `origin/main`. Stage 2 was explicitly not
+started. Everything below was measured on the post-migration tree, not inferred.
+
+## 8. Stage 1 outcome
+
+| Item | Result |
+|---|---|
+| `v1/` app files moved to root via `git mv` | Git records 6 files + 25 assets as 100% renames |
+| `game.js`, `style.css`, `sponsor.js` | Byte-identical to their `v1/` versions (rename 100%) |
+| Root `index.html` | Real game page; old canonical URL removed |
+| `v1/index.html` | Compatibility redirect, preserves query string and hash |
+| Files remaining under `v1/` | Only `index.html` + `fd46d3bf…txt` |
+| Leaderboard | Fully offline; zero network requests |
+| `node physics.test.js` | PASS |
+| `node gameplay.test.js` | 47 passed / 0 failed (was ENOENT before migration) |
+| `node name-filter.test.js` | 33 passed / 0 failed (min build) |
+| `node name-filter.test.js leaderboard.js` | 33 passed / 0 failed (source build) |
+| Asset byte integrity | 25 / 25 identical (`git hash-object --no-filters`) |
+| Browser smoke: desktop 1280×900 | 11/11 sprites loaded, layout intact |
+| Browser smoke: 320×568 / 390×844 | No horizontal overflow, dialogs usable |
+| Browser smoke: `file://` | No page errors, 11/11 sprites loaded |
+| `/v1/?x=1#h` redirect | Lands on `/?x=1#h` |
+| External network requests | **0** across all page loads |
+| 30-drop live play | Merges, scoring, floats, stacking correct; no NaN |
+
+## 9. Open defects found after execution
+
+### 9.1 `preview.png` is stale (confirmed)
+
+`preview.png` was last modified in `b947132` (2026-09-28), the initial import. Two
+features landed after that and are therefore missing from the screenshot:
+
+- the revive-coin chip (`43a92a4` "新玩法：复活机会 + 神奶蛙清场"), and
+- the merge-chain note line ("两个神奶蛙撞在一起会一起炸掉…"), also `43a92a4`.
+
+The screenshot still shows the old tip block and no chain note. It is also inconsistent
+with the README, which now describes the revive coin prominently. A freshly captured
+1280×900 frame with 14 fruits, score 92, the revive chip in the DOM, and the chain note
+visible was produced during review but **not committed** — refreshing it was not
+authorized by the plan (PLAN.md:44 makes it conditional on material misrepresentation).
+Recommendation: refresh it in a small standalone commit, or accept the drift.
+
+### 9.2 Line-ending policy is not actually enforced (confirmed defect)
+
+`.gitattributes` declares `* text=auto eol=lf`, but most tracked text files are stored
+with CRLF in the repository blobs. Measured on the current tree:
+
+| File | blob | worktree |
+|---|---|---|
+| `index.html` | CRLF | CRLF |
+| `style.css` | CRLF | CRLF |
+| `game.js` | CRLF | CRLF |
+| `README.md` | CRLF | CRLF |
+| `physics.test.js` | CRLF | CRLF |
+| `assets/fruits/parts.js` | CRLF | CRLF |
+| `leaderboard.js` | LF | LF |
+| `leaderboard.min.js` | LF | LF |
+| `sponsor.js` | LF | LF |
+| `gameplay.test.js` | LF | LF |
+| `name-filter.test.js` | LF | LF |
+| `assets/fruits/blur.js` | LF | LF |
+
+Evidence that the attribute is genuinely not applied to these paths:
+
+- `git check-attr text eol -- index.html` reports `text: auto`, `eol: lf`;
+- staging a modified copy of `README.md` keeps 408 CR bytes in the blob (no
+  normalization, no warning);
+- staging a brand-new CRLF file does normalize and does warn
+  ("CRLF will be replaced by LF"), so the attribute works only for new paths;
+- `git add --renormalize README.md` reduces the blob to 0 CR bytes — i.e. the fix is
+  one command, but it would rewrite ~every text file in one commit.
+
+Root cause: the files were committed before the attribute took effect for them
+(`.gitattributes` was added in the initial commit `b947132` alongside the CRLF files),
+so the index already held CRLF and Git never re-applied the filter.
+
+Impact: cosmetic today (both variants run fine, all tests pass), but it produces
+whole-file diffs whenever an editor or script rewrites a file, which is exactly what
+happened during this migration and had to be corrected by hand. It will keep biting
+every future edit. Recommendation: one dedicated `git add --renormalize .` commit,
+separate from any functional change, or drop `eol=lf` from `.gitattributes` and accept
+CRLF as the repository norm. Do not mix it into a feature commit.
+
+### 9.3 Asset pipeline still cannot run here (unchanged)
+
+`numpy` and `Pillow` are absent (Python 3.13.5), so `normalize_assets.py`,
+`build_parts.py`, `optimize_sprites.py` and `make_blur.py` were verified only
+statically:
+
+- all four compile (`python3 -m py_compile`);
+- all four path constants resolve to the repository root from any cwd;
+- the two parsers that read `game.js` were simulated against the root file:
+  `optimize_sprites.py` extracts 11 radii `[17, 23, 31, 39, 48, 58, 69, 81, 94, 108, 124]`,
+  `make_blur.py` extracts 11 sprite paths starting `assets/fruits/01-grape.webp`.
+
+So the migration's path work is sound, but a real regeneration run is still unproven.
+Installing the two packages is a system-state change and was not done without approval.
+
+### 9.4 Leaderboard is offline by design, with a re-enable path
+
+`ONLINE_ENABLED = false` gates every network call at the single `post()` choke point,
+plus `refreshBoard()`, `pushScore()` and `onGameOver()`. `DanaiwaBoard.setOnline(true)`
+restores the original behaviour at runtime; `name-filter.test.js` uses that hook, so the
+old online logic still has regression coverage (33 assertions, both builds). The
+dialog footer text is also switched, because the original wording
+("只取最近 20 次提交…") contradicts the placeholder.
+
+`leaderboard.min.js` remains a **hand-synchronized** copy of `leaderboard.js`: there is
+still no minifier in the repository (`tools/minify-leaderboard.py` never existed). Both
+files were edited in lockstep here and both were tested, but this is a manual invariant
+that will silently break. See §2.3.
+
+### 9.5 Deployment chain still unverified
+
+Pushing `origin/main` was done on the owner's instruction. It is still **unknown**
+whether that publishes the site, and which repository is canonical: `origin` is
+`tianyimc/BigNaiWa-Pro`, while the historically referenced Pages URL was
+`yhsome.github.io/BigNaiWa/`. The live check earlier in this session confirmed the
+`yhsome` site served the old redirect page; nothing here proves it redeploys from this
+repository. `www.tianyimc.xyz` did not resolve from this host. Marked 未确定.
+
+### 9.6 Screenshots and previews were not committed
+
+Browser smoke screenshots were taken in a scratch directory and deleted; only the
+numbers survive in §8. If visual review artifacts are wanted in the repository, they
+need an explicit location and a retention decision.
+
+## 10. Recommendations for the next commit
+
+1. Refresh `preview.png` (standalone commit, no code change) — see 9.1.
+2. Decide the line-ending policy and, if LF, land `git add --renormalize .` alone — see 9.2.
+3. If asset tooling must be trusted, authorize installing `numpy` + `Pillow` and run all
+   four scripts once to prove round-trip regeneration — see 9.3.
+4. Before Stage 2, confirm the deployment question in 9.5 so gameplay work is not
+   validated against an unknown target.
+5. Keep Stage 2 features in separate commits per feature, per PLAN.md:114-123.
