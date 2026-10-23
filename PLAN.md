@@ -1,117 +1,130 @@
-# Gameplay Additions Roadmap
+# Repository Migration and Gameplay Additions Plan
 
-## Product direction
+## Execution contract
 
-Extend the existing fruit-drop, physics, merge, and survival loop with additive content. Keep the current single-board rules, controls, and progression recognizable. Do not introduce a separate game mode or replace the core loop as part of this plan.
+This plan has two separately authorized stages.
 
-## Existing foundation
+1. **Stage 1 — Repository layout migration and site cleanup.** Complete only the repository, routing, documentation, tooling, tests, and leaderboard placeholder work specified below. When Stage 1 is complete, stop and report the diff and verification results. Do not start Stage 2 until the owner explicitly authorizes continuation.
+2. **Stage 2 — Additive gameplay updates.** Start only after explicit owner authorization following Stage 1 review. Implement the features in the sequence below without creating another mode or replacing the existing core loop.
 
-- Aim and drop fruit; matching tiers merge into the next tier.
-- Merges award tier-based score. The highest-tier pair clears both fruits for 500 points and one revive coin.
-- A landed fruit that remains above the danger line and nearly still for 1.5 seconds ends the run.
-- Every 2,000 points grants a revive coin. Spending one clears the highest fruit and any fruit still above the danger line, then resumes play.
-- Current fruit, next fruit, merge chain, score, best score, sound toggle, and recent-score leaderboard are already present.
+Do not combine the stages into one implementation or one commit. Keep each stage reviewable and commit only files belonging to that stage.
 
-## Proposed additions
+## Project identity and public links
 
-### P1 — Merge-chain bonus
+- The canonical repository is the owner's fork: `https://github.com/tianyimc/BigNaiWa-Pro` (`origin`, branch `main`). Use this repository identity in repository documentation and project references.
+- Remove direct-play URLs and claims that the game is currently playable online from the README and page metadata. Do not substitute another live game URL. Local instructions remain appropriate.
+- Do not assume that pushing `origin/main` publishes a website. The deployment source is not established by this plan.
+- Preserve attribution to the upstream projects already listed in the README. At the end of the README, add a clear attribution naming the original author/maintainer as `Tianyimc` and the canonical repository above. Do not imply that the upstream references authored this repository's original implementation.
 
-Detect a single uninterrupted cascade where a newly created fruit immediately merges again. Show the chain count and award a modest bonus for genuine consecutive merges. Define cascade boundaries explicitly so ordinary unrelated merges do not count. Tune the reward so it supplements merge score without dominating it.
+## Stage 1 — Repository layout migration and site cleanup
 
-**Player value:** Rewards planning placements that create cascades and makes successful merges easier to read.
+### Objective
 
-### P1 — Merge discovery collection
+Move the active game from `v1/` to the repository root, make root `index.html` the real game page, and align paths and documentation. Keep an intentional compatibility page at `/v1/` that redirects visitors to the root game.
 
-Track which fruit tiers the player has merged into at least once. Show discovered tiers in the existing merge-chain display and retain this collection locally between runs. Keep collection progress cosmetic; it must not affect physics, spawn odds, or score.
+### Current layout
 
-**Player value:** Gives players a lightweight long-term goal and makes the existing merge chain feel like progress.
+- Root `index.html` currently redirects to `./v1/`.
+- `v1/index.html`, `v1/game.js`, `v1/style.css`, `v1/leaderboard.js`, `v1/leaderboard.min.js`, `v1/sponsor.js`, and `v1/assets/` are the active game and assets.
+- `src/`, `tools/`, tests, and project documentation are already at the repository root.
+- Tests and asset scripts use mixed root and `v1/` paths. The gameplay test currently expects root game/assets and does not match the checked-in layout.
 
-### P1 — Run highlights and statistics
+### Required changes
 
-Track a small set of run metrics: highest cascade, highest tier reached, number of top-tier clears, danger recoveries, and revives used. Present them on the existing end screen without displacing the score, best score, or leaderboard flow.
+1. Inventory references to `v1/`, `./v1/`, `v1\\`, and page-relative application/assets paths across the repository.
+2. Move the active game page, JavaScript, CSS, leaderboard files, sponsor file, and `v1/assets/` contents to corresponding root locations. Preserve the root `src/`, `tools/`, tests, and metadata.
+3. Replace root `index.html` with the current actual game page. Update page metadata to remove online-play claims and stale canonical URLs. Keep relative references valid from root.
+4. Leave `v1/index.html` as a small, intentional compatibility redirect to `../` (preserving query string and hash where practical). Keep the verification text file under `v1/` only if required for the existing verification path; also retain the root copy. Remove other duplicate `v1/` files once confirmed unnecessary. The acceptance criterion is that no active application files remain under `v1/`, except this redirect and any intentionally retained verification artifact.
+5. Update `tools/normalize_assets.py` and `tools/build_parts.py` to write to root `assets/fruits/`. Anchor all four asset scripts to the repository root derived from `__file__`, including their reads of `src/`, `game.js`, and fruit assets, so invocation works from any current directory.
+6. Update all test loaders to read root `game.js` and root `assets/fruits/`. Inspect `physics.test.js`, `gameplay.test.js`, and `name-filter.test.js`; ensure each points to actual files and the existing behavior is covered.
+7. Update the README's project structure, paths, local run instructions, test commands, and repository links. Remove direct online-play links. Preserve the existing upstream reference list and append the owner/original-author attribution at the end.
+8. Check all moved runtime assets are present at root: `parts.js`, `blur.js`, all 11 WebP sprites, PNG sources, and the sponsor QR asset. Preserve the files and verify the move did not alter their bytes.
+9. Do not silently drop leaderboard functionality files. Keep `leaderboard.js` and `leaderboard.min.js` in the repository, but disable all leaderboard network reads, writes, automatic score submissions, and retry behavior for now. The leaderboard buttons should still open the existing dialog (or a compact placeholder dialog) and display exactly: **“正在完善中，敬请期待”**. Keep a clear path to re-enable the feature later. Do not delete leaderboard source or generated files.
+10. Resolve stale leaderboard build instructions while preserving the files: remove or correct references to the missing `tools/minify-leaderboard.py`; do not create a minifier as part of this stage.
+11. Refresh `preview.png` only if the existing screenshot materially misrepresents the post-migration page; this is a documentation asset, not a gameplay feature.
+12. Review the diff to confirm Stage 1 has not changed gameplay mechanics. No production deployment or publication is authorized by this plan.
 
-**Player value:** Makes each run memorable even when it does not place on the leaderboard.
+### Stage 1 verification and acceptance
 
-### P2 — Danger-line recovery reward
+- Root `index.html` opens the game directly; `/v1/` redirects to root.
+- No stale live-play URL or canonical URL to the former site remains in page metadata or README.
+- README identifies `tianyimc/BigNaiWa-Pro`, provides local run guidance, and ends with the requested author/repository attribution.
+- Leaderboard UI displays the placeholder and produces no network requests, score submissions, or reads; leaderboard source and minified files remain in the repository.
+- All runtime assets exist at root and load through correct relative paths.
+- Asset scripts resolve their inputs and outputs from the repository root regardless of working directory. If Python dependencies are unavailable, report that limitation; do not install dependencies without authorization.
+- All three existing Node self-check scripts (`physics.test.js`, `gameplay.test.js`, `name-filter.test.js`) pass.
+- Smoke-check root page layout, fruit rendering, sponsor dialog, and leaderboard placeholder at desktop and narrow mobile widths.
+- The only intentional `v1/` runtime artifact is the compatibility redirect, plus the verification file if its old path must remain valid.
+- Stop after reporting Stage 1 results. Wait for explicit owner authorization before Stage 2.
 
-Recognize a danger event that resolves before its per-fruit timer expires, such as the fruit falling below the line or merging away. Award a small, capped recovery bonus or include it in run highlights. Prevent deliberate danger-line farming by limiting repeated rewards and requiring a meaningful recovery.
+## Stage 2 — Additive gameplay updates (requires separate authorization)
 
-**Player value:** Turns a tense near-loss into a readable moment of skill.
+### Product direction
 
-### P2 — Drop-direction finesse
+Extend the existing fruit-drop, physics, merge, and survival loop. Do not introduce a separate mode, new core loop, or unrelated inventory system. Preserve current controls and loss condition except for the narrowly scoped optional finesse input described below.
 
-Add an optional, small left/right impulse at release, accessible through keyboard controls and clear touch affordances. Keep the existing aim position as the primary control and make the impulse subtle enough that it cannot replace aiming.
+### Feature 1: Cascade detection and run statistics
 
-**Player value:** Adds a little control for threading gaps while preserving the familiar drop mechanic.
+Implement this first because other proposed features depend on these events.
 
-### P3 — Revive choice
+- A normal merge creates the next-tier fruit. It extends the current cascade only if that exact newly created fruit is consumed by another merge within **600 ms**, with no player drop occurring between the two merge events.
+- The first merge starts a cascade of length 1. Each qualifying subsequent merge increments it. An unrelated merge starts a separate cascade at length 1.
+- A highest-tier pair clear creates no fruit; it ends any active cascade and is not counted as a cascade merge. It still increments the top-tier-clear statistic.
+- Track per run: highest cascade length, highest tier reached (include starting fruit tiers when dropped), top-tier pair clears, danger recoveries, and revives used.
+- Display these five values as a compact two-column summary on the existing game-over panel, between the best-score row and submission/placeholder area. Preserve score, best score, restart, sponsor, and leaderboard entry points. Confirm the layout at 320×568 and 390×844.
+- Reset all run statistics at new game; update them only from authoritative gameplay events, not rendering.
 
-At the existing revive prompt, offer the current rescue as the default and consider one higher-cost option that clears a wider area. Keep the choice compact and explain the cost before the player commits.
+### Feature 2: Merge discovery collection
 
-**Player value:** Gives a revive a small strategic decision while reusing the existing recovery flow.
+- Record a tier as discovered the first time the player creates it by merging two fruits into that tier. Reaching tier 10 through two tier-9 fruits counts.
+- Persist discovered tier indexes in `localStorage` under `danaiwa.discovery.v1`; validate stored data and tolerate malformed or unavailable storage.
+- Show undiscovered tiers as silhouettes in the existing merge-chain display. Revealed fruit appearance follows the existing art. Do not change spawn odds, physics, score, or revive progress.
+- Discovery persists across runs and is separate from run statistics. Do not add a reset control in this release.
 
-## Suggested sequence
+### Feature 3: Cascade feedback and bonus
 
-1. Define cascade detection and add run-stat tracking; show a concise end-of-run summary.
-2. Add locally saved merge discovery to the current merge-chain display.
-3. Tune and add a modest cascade bonus after the cascade rules are clear.
-4. Explore the danger recovery reward with anti-farming limits.
-5. Prototype the small directional impulse; retain it only if it improves control without making placement trivial.
-6. Consider the revive choice after observing how often players hold or spend revive coins.
+- When a cascade ends (no qualifying continuation within 600 ms, or a player drop begins), show a concise chain count near the final merge. Cap displayed text at `×5+` while retaining the actual maximum in statistics.
+- Award `min(cascadeLength - 1, 5) × 5` bonus points for cascades of length 2 or more (maximum +25). A length-1 merge receives no cascade bonus.
+- Cascade bonus points must not grant revive coins. Implement the score award so it updates score/best score but bypasses the ordinary 2,000-point revive grant path. Ordinary merge points retain current revive behavior.
+- The top-tier pair clear remains +500 and grants its existing revive coin; it is not cascade-bonus eligible.
 
-## Scope and design guardrails
+### Feature 4: Danger recovery tracking and reward
 
-- Add to the current board, inputs, merge chain, and revive/end-screen flows.
-- Avoid adding a separate mode, new core loop, or a large inventory of consumable powers in this roadmap.
-- Keep optional assists understandable and usable on both desktop and touch screens.
-- Keep progression cosmetic unless a future balance review explicitly changes that decision.
-- Preserve the danger-line rule as the sole loss condition unless a separately reviewed design decision changes it.
-- Review `README.md` against the actual `v1/` implementation before publishing gameplay changes; the README currently describes some older behavior and file locations.
+- A recovery is credited to the same fruit only after its danger timer reaches at least 0.5 seconds, then that fruit either falls below the danger line or is consumed by a merge while the run remains active.
+- Count no more than three recoveries per run. Add +30 score per credited recovery, but route it through a score path that does not grant revive coins. Show a small recovery cue and increment the run statistic.
+- A fruit that merely passes above the line while moving, without accruing 0.5 seconds of danger time, is not a recovery. A single fruit can be credited only once.
+- Add boundary checks for 0.49/0.50 seconds, fruit falling below the line, merge removal, duplicate credit prevention, and the three-recovery cap.
 
-## Open design decisions for implementation planning
+### Feature 5: Optional drop-direction finesse
 
-- Whether the cascade bonus grants score only or also contributes to revive progress.
-- The persistence format and reset controls for the discovery collection.
-- Which run statistics fit the end screen without making it crowded on narrow screens.
-- Input mapping and maximum impulse for directional finesse.
-- The cost and exact clear radius of a second revive choice.
+- Keep current `←/→` and `A/D` aim movement unchanged. Add keyboard finesse with `Shift+←` and `Shift+→` while not typing in an input.
+- On touch, use the final 120 ms horizontal flick velocity of the existing aim drag as the finesse input. Show a small left/right cue before release so the effect is understandable.
+- Clamp horizontal release velocity to ±60 px/s; retain the current 130 px/s downward velocity. A neutral or slow release has zero horizontal impulse.
+- Apply the impulse only when the fruit is dropped; do not alter aim position or move already-dropped fruit by user input.
+- Keep behind a simple feature flag during tuning. Retain it only if pointer/keyboard usability remains clear and controlled; if it degrades aiming precision, remove the feature before release rather than expanding its strength.
 
-## Repository layout migration plan
+### Feature 6: Revive choice
 
-### Goal
+- Preserve the current one-coin rescue: spend 1 coin, remove the highest fruit and every fruit still above the danger line, clear danger timers, and resume.
+- Add a wider rescue costing 2 coins: remove the three highest fruits and every fruit still above the danger line, then resume. Each fruit is removed once even if it meets both criteria.
+- Show both choices in the existing revive prompt with the cost visible on each button. Disable the wider rescue when fewer than 2 coins are available and explain the required balance. Keep “give up” available.
+- Track a revive use once per successful choice, not once per removed fruit. Update the revive statistic after successful consumption only.
+- Keep the screen usable at 320 px width and add tests for 0, 1, and 2+ coins, overlapping clear criteria, and successful continuation.
 
-Make the repository root the canonical location for the playable game, rather than serving the game from `v1/`. Preserve a working site throughout the change and keep generated assets, tools, tests, and documentation pointed at one consistent layout.
+## Stage 2 sequence, tests, and review
 
-### Current layout to account for
+1. Add cascade event tracking and run statistics, with tests for timing, player-drop boundaries, unrelated merges, and top-tier clears.
+2. Add persisted merge discovery and silhouette rendering, with storage and tier-10 discovery tests.
+3. Add cascade display and score bonus, verifying the bonus never grants revive coins.
+4. Add danger recovery tracking/reward, including anti-farming boundary tests.
+5. Prototype directional finesse behind a flag and inspect both keyboard and touch behavior. Remove it if it harms precise aiming.
+6. Add the two-cost revive choice and its narrow-screen behavior.
 
-- Root `index.html` is a redirect to `./v1/`; it is not the game page.
-- `v1/index.html`, `v1/game.js`, `v1/style.css`, `v1/leaderboard.js`, `v1/leaderboard.min.js`, and `v1/sponsor.js` are the active application files.
-- `v1/assets/` contains the active fruit assets and sponsor QR image.
-- `src/` contains source fruit images and should remain at the root.
-- `tools/` contains asset-generation scripts and should remain at the root.
-- Tests are at the root, but they do not all resolve application files the same way.
-- `README.md` describes several active files as if they already live at the root.
-- Asset scripts use mixed output/input roots: some write to `v1/assets/fruits`, while others expect root `assets/fruits` and root `game.js`.
+For each feature, update the existing Node self-check suite with observable behavior and edge-case assertions. Keep tests deterministic by controlling time and input events; do not rely on arbitrary wall-clock sleeps. After each feature, review the resulting UI on desktop and narrow mobile widths. Keep Stage 2 changes separate from the completed Stage 1 commit and report any deviations from the specified behavior.
 
-### Migration steps
+## Non-goals
 
-1. **Inventory references before moving files.** Search the repository for `v1/`, `./v1/`, `v1\\`, hard-coded `os.path.join("v1", ...)`, and page-relative asset paths. Record every reference in HTML, JavaScript, Python, tests, and docs.
-2. **Move the active app to the root.** Move `v1/index.html`, `game.js`, `style.css`, `leaderboard.js`, `leaderboard.min.js`, `sponsor.js`, and `v1/assets/` into the corresponding root locations. Keep `src/`, `tools/`, tests, and root-level project metadata where they are.
-3. **Resolve duplicate and legacy files deliberately.** Compare `v1/fd46d3bf08af562b46f4afcdd8134ffc.txt` with the root copy before removing the duplicate. Do not blindly delete `v1/` until all needed files are moved and references are updated. Check whether any remaining files under `v1/` are intentional historical artifacts; either retain them with a clear purpose or remove them as part of the migration.
-4. **Replace the redirect with the real game page.** The root `index.html` should become the former `v1/index.html`. Remove the redirect logic and update canonical URL/metadata if needed. Relative references such as `style.css`, `game.js`, and `assets/...` should resolve from root after the move.
-5. **Normalize all asset scripts to the root layout.** Update `tools/normalize_assets.py` and `tools/build_parts.py` output paths from `v1/assets/fruits` to `assets/fruits`. Verify `tools/optimize_sprites.py` and `tools/make_blur.py` resolve `game.js` and `assets/fruits` from the repository root. Keep the source-image input at root `src/`.
-6. **Normalize test fixtures and loaders.** Update `physics.test.js` to load root `game.js` and `assets/fruits/parts.js`. Confirm `gameplay.test.js` paths match the same layout, and inspect other test scripts for `v1/` references. Keep tests at root unless a separate test-directory design is explicitly chosen.
-7. **Update documentation and deployment instructions.** Revise the README file table, asset paths, local-run steps, and Pages instructions so root is consistently described as the app root. Remove references to the old `/v1/` URL unless they are needed as a historical redirect note.
-8. **Check repository references and tracked outputs.** Search again for stale `v1/` application paths. Confirm expected generated files (`parts.js`, `blur.js`, optimized sprites) are present at their new paths and no unintended duplicates remain.
-9. **Verify the migrated application.** Run the existing physics and gameplay self-check scripts. Open the root `index.html` through a local static server and confirm fruit images, sound toggle, leaderboard/sponsor dialogs, and mobile layout load. Also confirm `file://` behavior if it remains a documented use case.
-10. **Review the resulting diff.** Ensure the change is a path/layout migration, with gameplay behavior unchanged. Confirm the root page is the only intended production entry point and GitHub Pages can continue publishing from the repository root.
-
-### Migration acceptance criteria
-
-- Opening the repository root serves the game directly; no redirect to `/v1/` remains.
-- Runtime files and assets load from root-relative paths.
-- All asset tools generate/read files from the same root layout.
-- Existing tests load the root game and root assets consistently.
-- README, test instructions, and GitHub Pages guidance match the actual layout.
-- No required production file remains stranded under `v1/`.
-- The migration does not intentionally change gameplay rules or balance.
+- No separate game mode or replacement of the fruit merge loop.
+- No landing-path or landing-point preview.
+- No online leaderboard connection during Stage 1; retain its files and show the placeholder only.
+- No online deployment or public launch without a separate explicit request.
