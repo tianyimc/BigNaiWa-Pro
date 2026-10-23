@@ -128,3 +128,33 @@ For each feature, update the existing Node self-check suite with observable beha
 - No landing-path or landing-point preview.
 - No online leaderboard connection during Stage 1; retain its files and show the placeholder only.
 - No online deployment or public launch without a separate explicit request.
+
+## Review response: `PLAN_FEEDBACK.md` and Stage 1 check
+
+This section responds to the post-execution review. The earlier feedback sections that describe the pre-migration layout are historical context; the outcomes below describe the current repository. Stage 2 remains unstarted and still requires explicit owner authorization.
+
+### Rechecked in the current checkout
+
+- `node physics.test.js`: **PASS**.
+- `node gameplay.test.js`: **PASS**, 47 passed / 0 failed.
+- `node name-filter.test.js`: **PASS**, 33 passed / 0 failed. The suite checks that the default leaderboard UI is offline and shows the placeholder; it also explicitly enables online behavior in an isolated test case to retain regression coverage.
+- Root assets: **PASS** inventory check — 11 WebP sprites, 11 PNG sprites, `parts.js`, `blur.js`, and `assets/sponsor-qr.jpg` are present.
+- Compatibility route: `v1/index.html` exists. The feedback records a browser check that `/v1/?x=1#h` reaches `/?x=1#h`.
+- Asset tooling paths: root anchoring is implemented in all four scripts. The feedback records successful syntax/static-path checks and parser checks. Full asset regeneration remains unverified because NumPy and Pillow are unavailable; do not install them as part of this plan without separate authorization.
+- Repository links: README and root page identify `tianyimc/BigNaiWa-Pro`; no former live-play URL was found in those files during the current check. The deployment source remains unknown, and no deployment is part of this plan.
+
+### Feedback decisions and remaining follow-ups
+
+1. **Workstream sequencing:** accepted and completed as specified: Stage 1 preceded Stage 2. Stage 2 must remain paused until the owner authorizes it.
+2. **Root-anchored tools and generated assets:** accepted and implemented. The existing runtime asset inventory is complete; regeneration has not been proven without the missing Python packages.
+3. **Leaderboard build source:** keep both `leaderboard.js` and `leaderboard.min.js` as requested. They are currently hand-synchronized because the referenced minifier does not exist. Treat them as a known maintenance risk; do not remove either file or add a build dependency in this plan. Any future edit to leaderboard behavior must update and test both files.
+4. **Verification-file duplicate:** keep the root verification file and the copy under `v1/` while the compatibility path may still be used. The only intended contents under `v1/` are its redirect and that verification file.
+5. **Preview image:** the feedback confirms `preview.png` predates the revive chip and merge-chain note, so it is stale. Refresh it as a small documentation-only follow-up before claiming the repository presentation is fully current; do not mix that asset update into gameplay changes.
+6. **Line endings:** the feedback confirms existing CRLF blobs conflict with the declared LF policy. This is not a functional Stage 1 failure, but it can create noisy future diffs. Before Stage 2 edits, choose one repository-wide policy and make any normalization a standalone commit. Do not combine `git add --renormalize .` with functional work.
+7. **Deployment:** remain explicitly unverified. The current plan removes direct-play claims and does not deploy. Local implementation and tests do not depend on resolving which GitHub Pages source, if any, is active.
+8. **Gameplay detail and acceptance tests:** addressed in the Stage 2 feature specifications and test sequence above, including the 600 ms cascade boundary, bonus/revive interaction, discovery persistence, recovery cap, directional input limits, revive costs, mobile layout, and edge cases.
+9. **Review screenshots:** visual smoke checks are required for the specified viewport sizes, but screenshots need not be committed unless the owner requests them. Refreshing the public preview image is handled separately under item 5.
+
+### Stage 1 status
+
+The gameplay and path self-checks pass, the current root asset inventory is complete, and the reviewed migration behavior matches the intended layout. Remaining items are documentation/maintenance follow-ups (stale preview and line-ending policy) and environment/deployment limitations (asset regeneration dependencies and unknown hosting source); they are not failures of the tested gameplay runtime. Keep these follow-ups visible and do not infer deployment success from a Git push.
