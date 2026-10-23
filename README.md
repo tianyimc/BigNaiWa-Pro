@@ -3,11 +3,12 @@
 纯 **HTML + CSS + JavaScript** 的静态网页小游戏，零依赖、零构建、离线可玩。
 物理引擎（PBD 位置约束求解）是自己写的，没有引入 matter.js 等任何第三方库。
 
-## 🎮 在线玩
+## 仓库
 
-**<https://yhsome.github.io/BigNaiWa/>**
-
-（GitHub Pages 托管，手机浏览器打开就能玩，也可以「添加到主屏幕」当 App 用。）
+- 本仓库：**<https://github.com/tianyimc/BigNaiWa-Pro>**
+- 纯静态页面，没有构建步骤，也不需要后端。
+- 本项目目前**没有对外公布的线上地址**；部署由仓库拥有者自行决定，本文档不提供直玩链接。
+  想玩请按下面的「运行」一节在本地打开。
 
 ![预览](preview.png)
 
@@ -73,17 +74,20 @@ for (const b of balls) {
 
 ## 运行
 
-线上直接开 <https://yhsome.github.io/BigNaiWa/>；
-本地双击 `index.html` 即可（`file://` 协议下也能跑，排行榜同样可用）。
-也可以起个静态服务：
+本地双击 `index.html` 即可（`file://` 协议下也能跑）。
+也可以起个静态服务（推荐，行为更接近真实环境）：
 
 ```bash
 python -m http.server 8080
 # 打开 http://localhost:8080
 ```
 
-部署：仓库打开 **Settings → Pages → Source = Deploy from a branch → main / (root)** 即可，
-根目录已经放了 `.nojekyll`，静态文件原样发布。
+根目录就是站点根目录：`index.html`、`game.js`、`style.css`、`assets/` 都在这里，
+仓库里还放着 `.nojekyll`，静态托管会原样发布。
+
+`v1/` 只保留一个**兼容跳转页**，把旧链接带到根页面，里面没有游戏代码。
+
+> 部署与否由仓库拥有者决定，本仓库不附带线上地址。
 
 ## 文件
 
@@ -92,7 +96,8 @@ python -m http.server 8080
 | `index.html` | 页面结构：棋盘、结束遮罩、侧边面板、排行榜弹窗 |
 | `style.css` | 全部样式：玻璃拟态面板、响应式布局、结束动画、排行榜 |
 | `game.js` | 游戏逻辑 + 自研物理 + Canvas 渲染 + WebAudio 音效 |
-| `leaderboard.min.js` | 在线排行榜的构建产物（TinyWebDB 接口 + 弹窗渲染），页面直接引用它 |
+| `leaderboard.js` | 排行榜源码（TinyWebDB 接口 + 弹窗渲染 + 昵称屏蔽词） |
+| `leaderboard.min.js` | 页面实际引用的排行榜副本（手工与 `leaderboard.js` 同步，**不是**自动构建产物） |
 | `sponsor.js` | 结算页「赞助作者」弹窗（展示微信收款码），纯静态、无网络请求 |
 | `assets/fruits/` | 水果贴图：`*.png` 是 512×512 的源图，页面实际加载的是 `*.webp`；另有 `parts.js` 碰撞形状、`blur.js` 极模糊占位图 |
 | `tools/normalize_assets.py` | 素材统一脚本：抠底、去噪、统一画布、烤暗边 |
@@ -102,9 +107,22 @@ python -m http.server 8080
 | `src/` | 原始素材（11 张，格式/尺寸/底色都不统一），只作为脚本输入 |
 | `physics.test.js` | 物理手感自检脚本（`node physics.test.js`） |
 | `gameplay.test.js` | 复活 / 清场玩法自检（`node gameplay.test.js`） |
+| `name-filter.test.js` | 排行榜界面 + 昵称屏蔽词 + 离线占位自检（`node name-filter.test.js`） |
+| `v1/index.html` | 兼容跳转页：把旧的 `/v1/` 链接带到根页面，没有游戏代码 |
+| `v1/fd46d3bf08af562b46f4afcdd8134ffc.txt` | 微信网站验证文件（保留旧路径，根目录也有一份） |
 | `preview.png` | 预览图 |
 
-## 排行榜
+## 排行榜（当前：占位状态）
+
+**排行榜目前是关闭的。** 两处入口按钮照常打开弹窗，弹窗里只显示一句
+**「正在完善中，敬请期待」**，并且**不发任何网络请求**：不读榜、不提交成绩、不重试。
+
+- 联网开关在 `leaderboard.js` / `leaderboard.min.js` 顶部：`let ONLINE_ENABLED = false;`
+- 改成 `true` 就恢复下面的完整逻辑（网络代码一行都没删）；
+- 运行期也能切换：`DanaiwaBoard.setOnline(true)` / `.setOnline(false)`；
+- 排行榜源码与压缩副本都保留在仓库里，没有删除。
+
+下面记录的是**恢复联网后**的行为，留着备查。
 
 用的是 **TinyWebDB**（`https://tinywebdb.appinventor.space/api`）——一个给 App Inventor 用的
 极简 key-value 云存储，靠 POST 表单调用，跨域头是 `Access-Control-Allow-Origin: *`，
@@ -156,8 +174,13 @@ POST user=<你的 user>&secret=<你的 secret>&action=search&no=1&count=100&tag=
 - **XSS**：榜单全部用 `textContent` 渲染，不拼 HTML；
 - 榜单是最近 20 次提交（最新两页足够覆盖），弹窗底部有标注。
 
-换账号：改排行榜源码顶部的 `USER` / `SECRET` / `PREFIX` 即可，改完跑一遍构建脚本产出
-`leaderboard.min.js`（换 `PREFIX` 相当于另开一个榜）。
+换账号：改排行榜源码顶部的 `USER` / `SECRET` / `PREFIX` 即可（换 `PREFIX` 相当于另开一个榜）。
+
+> **注意**：仓库里**没有**自动压缩脚本（早期文档提到的 `tools/minify-leaderboard.py`
+> 并不存在）。页面实际引用的是 `leaderboard.min.js`，它是 `leaderboard.js` 的
+> **手工同步副本**——改了源码必须手动把同样的改动同步进去，否则两者会不一致。
+> 自检脚本可以分别验证两份文件：`node name-filter.test.js`（默认测 min 版）、
+> `node name-filter.test.js leaderboard.js`（测源码版）。
 
 ## 碰撞形状（不是圆）
 
@@ -308,6 +331,20 @@ python tools/build_parts.py --max-parts 16 --preview   # 换了贴图后重新�
 node physics.test.js                                   # 物理自检
 ```
 
+另外两个自检脚本：
+
+```bash
+node gameplay.test.js        # 复活币发放 / 越线询问屏 / revive() / 神奶蛙清场（47 项）
+node name-filter.test.js     # 排行榜界面 + 昵称屏蔽词 + 离线占位（32 项，默认测 min 版）
+node name-filter.test.js leaderboard.js   # 同样的断言跑一遍源码版
+```
+
+三个脚本都在仓库根目录，直接 `node <文件名>` 即可；它们各自读取根目录的
+`game.js` 与 `assets/fruits/parts.js`，不需要先起服务器。
+
+> 素材脚本依赖 `numpy` 和 `Pillow`。本机当前**没有**安装这两个包，所以只做了语法与
+> 路径解析校验；要真正重跑素材流水线，需要先装依赖。
+
 ## 手机端适配
 
 | 项 | 做法 |
@@ -356,6 +393,14 @@ node physics.test.js                                   # 物理自检
 - [CaptainAries/dxg](https://github.com/CaptainAries/dxg)
 - [moonfloof/suika-game](https://github.com/moonfloof/suika-game) — 使用 matter.js 的英文版克隆
 - [IceburgLettuce17/suika-game-js-beta](https://github.com/IceburgLettuce17/suika-game-js-beta)
+
+## 作者与仓库
+
+- 原始作者 / 维护者：**Tianyimc**
+- 规范仓库：**<https://github.com/tianyimc/BigNaiWa-Pro>**
+
+上面「参考的开源项目」只是玩法与水果链设计的参考对象，**没有**参与本仓库
+原创实现的编写，也不对本仓库的内容负责。
 
 ## 许可
 

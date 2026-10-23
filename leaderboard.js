@@ -35,13 +35,28 @@
   /* ---------------------------------------------------------
    *  排行榜界面开关
    *
-   *  true  = 正常展示榜单（面板入口 + 结算弹窗入口都在）
-   *  false = 不展示榜单（入口隐藏、弹窗打不开、也不拉榜单），但成绩照旧上传
+   *  true  = 展示榜单弹窗（面板入口 + 结算弹窗入口都在）
+   *  false = 不展示榜单（入口隐藏、弹窗打不开）
    *
-   *  改完记得重新压一次：
-   *      python tools/minify-leaderboard.py
+   *  现在界面保持可用，但内容换成占位文案；真正的联网开关是下面的 ONLINE_ENABLED。
    * ------------------------------------------------------- */
   const BOARD_UI_ENABLED = true;
+
+  /* 联网开关（当前：关闭）
+   *
+   *  false = 完全离线：不读榜、不提交成绩、不重试，一个网络请求都不发。
+   *          两处入口按钮照常打开弹窗，弹窗里只显示占位文案。
+   *  true  = 恢复原来的 TinyWebDB 读写（网络代码一行都没删）。
+   *
+   *  运行期也能改：DanaiwaBoard.setOnline(true) 恢复联网，
+   *  setOnline(false) 回到占位状态。自检脚本用的就是这个钩子。
+   *
+   *  注意：现在没有可用的压缩脚本，leaderboard.min.js 是手工同步的副本；
+   *  改了这个文件之后，必须把同样的改动同步进 leaderboard.min.js。 */
+  let ONLINE_ENABLED = false;
+
+  /* 排行榜不可用时的统一占位文案（要改文案只改这一处） */
+  const PLACEHOLDER_TEXT = '正在完善中，敬请期待';
 
   const $ = (id) => document.getElementById(id);
 
@@ -49,7 +64,13 @@
    *  接口
    * ------------------------------------------------------- */
 
+  /* 所有网络请求的唯一出口。
+     离线模式下在这里就挡住：读榜、写成绩、重试，一个请求都发不出去，
+     即使有人从控制台调用 DanaiwaBoard.fetchTop() / submitScore() 也一样。 */
   function post(params) {
+    if (!ONLINE_ENABLED) {
+      return Promise.reject(new Error(PLACEHOLDER_TEXT));
+    }
     const body = new URLSearchParams();
     body.set('user', USER);
     body.set('secret', SECRET);
@@ -326,9 +347,23 @@
     });
   }
 
+  /* 弹窗底部那行说明：联网时讲规则，离线时不能再说「只取最近 20 次提交」 */
+  function paintNote() {
+    const note = $('boardNote');
+    if (!note) return;
+    note.textContent = ONLINE_ENABLED
+      ? '只取最近 20 次提交，成绩会被后来的人挤下去'
+      : '排行榜正在完善中，暂时不上传成绩';
+  }
+
   function refreshBoard(myScore) {
-    /* 界面关掉的时候不拉榜单（省一次请求），但保留 Promise 语义，
-       好让 pushScore 里的链路照常往下走 */
+    /* 离线模式：不拉榜单、不发请求，直接摆占位文案。
+       保留 Promise 语义，好让 pushScore 里的链路照常往下走。 */
+    if (!ONLINE_ENABLED) {
+      boardMessage(PLACEHOLDER_TEXT);
+      paintNote();
+      return Promise.resolve([]);
+    }
     if (!BOARD_UI_ENABLED) return Promise.resolve([]);
     boardMessage('正在读取排行榜…');
     return fetchTop().then((rows) => {
@@ -341,8 +376,9 @@
   }
 
   function openBoard() {
-    if (!BOARD_UI_ENABLED) return;      // 榜单暂时关闭，弹窗一律不打开
+    if (!BOARD_UI_ENABLED) return;      // 界面关闭时不打开弹窗
     if (!modal) return;
+    paintNote();
     modal.classList.add('show');
     modal.setAttribute('aria-hidden', 'false');
     refreshBoard(null).catch(() => { /* 已经提示过了 */ });
@@ -358,8 +394,12 @@
    *  结算 / 提交
    * ------------------------------------------------------- */
 
-  /* 真正写库 */
+  /* 真正写库。离线模式下直接返回，不发任何请求。 */
   function pushScore(name, score, viaRetry) {
+    if (!ONLINE_ENABLED) {
+      setMsg(PLACEHOLDER_TEXT, '');
+      return Promise.resolve(false);
+    }
     if (submitting) return Promise.resolve(false);
     if (!viaRetry) {
       const now = Date.now();
@@ -392,12 +432,18 @@
     pushScore(myName(), pendingScore, true);
   }
 
-  /* 打完一局：直接结算上榜（榜单是最近 WINDOW 次提交，谁都能进） */
+  /* 打完一局：离线模式下只摆占位文案，不提交成绩 */
   function onGameOver(score) {
     if (!submitBox) return;
     pendingScore = Number(score) || 0;
     paintName();
     showRetry(false);
+
+    if (!ONLINE_ENABLED) {
+      submitBox.style.display = '';
+      setMsg(PLACEHOLDER_TEXT, '');
+      return;
+    }
 
     if (!(pendingScore > 0)) {
       submitBox.style.display = 'none';
@@ -492,6 +538,11 @@
     submitScore: addScore,
     myName: myName,
     setName: function (n) { commitName(n); },
-    hasName: function () { return !!loadName(); }
+    hasName: function () { return !!loadName(); },
+    /* 联网开关：自检脚本用它切到联网模式验证原有逻辑；
+       默认 false（占位文案、零请求）。 */
+    setOnline: function (on) { ONLINE_ENABLED = !!on; paintNote(); },
+    isOnline: function () { return ONLINE_ENABLED; },
+    PLACEHOLDER_TEXT: PLACEHOLDER_TEXT
   };
 })();

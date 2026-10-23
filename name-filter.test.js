@@ -1,8 +1,9 @@
 /* ============================================================
- *  排行榜：界面恢复 + 昵称屏蔽词 行为测试
+ *  排行榜：界面 + 昵称屏蔽词 + 离线占位 行为测试
  *
  *  需求：
- *    · 排行榜界面恢复（两处入口按钮都在、弹窗能打开）
+ *    · 排行榜界面可用（两处入口按钮都在、弹窗能打开）
+ *    · 默认离线：弹窗显示「正在完善中，敬请期待」，零网络请求
  *    · 昵称含屏蔽词时，自动改成「默认用户」——提交时、改昵称时、
  *      以及榜单里已有的历史脏昵称，都要过滤
  *    · 正常昵称不受影响（例如「练习」里的「习」不该被误伤）
@@ -38,7 +39,8 @@ function makeEl(id, tag) {
 }
 
 const IDS = ['boardBtn', 'boardBtn2', 'boardModal', 'boardClose', 'boardRefresh', 'boardList',
-             'nickInput', 'submitBox', 'submitMsg', 'myNameLabel', 'submitBtn', 'editNameBtn'];
+             'nickInput', 'submitBox', 'submitMsg', 'myNameLabel', 'submitBtn', 'editNameBtn',
+             'boardNote'];
 const els = {};
 IDS.forEach((id) => { els[id] = makeEl(id); });
 
@@ -82,7 +84,7 @@ const sandbox = {
 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(__dirname, 'v1', TARGET), 'utf8'), sandbox, { filename: TARGET });
+vm.runInContext(fs.readFileSync(path.join(__dirname, TARGET), 'utf8'), sandbox, { filename: TARGET });
 
 const Board = sandbox.window.DanaiwaBoard;
 let pass = 0, fail = 0;
@@ -104,14 +106,29 @@ function boardNames() {
 (async function main() {
   console.log('目标文件: ' + TARGET + '\n');
 
-  console.log('[1] 排行榜界面已恢复');
+  console.log('[1] 排行榜界面可用 + 默认离线占位');
   ok(!!Board, '模块加载并导出 DanaiwaBoard');
   ok(els.boardBtn.hidden === false, '面板里的「排行榜」按钮可见');
   ok(els.boardBtn2.hidden === false, '结算弹窗里的「排行榜」按钮可见');
+  ok(Board.isOnline() === false, '默认是离线模式');
+  ok(Board.PLACEHOLDER_TEXT === '正在完善中，敬请期待', '占位文案正确：' + Board.PLACEHOLDER_TEXT);
+  calls.length = 0;
   Board.open();
   ok(els.boardModal.classList.contains('show') === true, 'open() 能打开弹窗');
+  await new Promise((r) => setTimeout(r, 30));
+  ok(calls.length === 0, '离线时打开弹窗不发任何网络请求');
+  /* boardMessage 是「清空 + append 一个 <p>」，所以要从子节点取文案 */
+  const placeholderNodes = (els.boardList.children || []).map((c) => c.textContent);
+  ok(placeholderNodes.join('').indexOf('正在完善中，敬请期待') >= 0,
+     '弹窗里显示占位文案：' + JSON.stringify(placeholderNodes));
+  ok(els.boardNote.textContent.indexOf('只取最近 20 次提交') < 0,
+     '离线时底部说明不再提「最近 20 次提交」：' + els.boardNote.textContent);
   Board.close();
   ok(els.boardModal.classList.contains('show') === false, 'close() 能关掉');
+
+  /* 以下 [2]~[5] 验证原有的联网逻辑，先显式切到联网模式 */
+  Board.setOnline(true);
+  ok(Board.isOnline() === true, 'setOnline(true) 切到联网模式');
 
   console.log('\n[2] 屏蔽词：一律变成「默认用户」');
   const banned = [

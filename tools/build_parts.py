@@ -22,7 +22,9 @@ import os
 import numpy as np
 from PIL import Image
 
-OUT = os.path.join("v1", "assets", "fruits")
+# 所有路径都从仓库根推出来（本文件在 tools/ 下），所以在任何目录下运行都对
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(ROOT, "assets", "fruits")
 TIERS = ["grape", "cherry", "orange", "lemon", "kiwi",
          "tomato", "peach", "pineapple", "coconut", "halfmelon", "watermelon"]
 

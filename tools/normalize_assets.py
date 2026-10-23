@@ -18,8 +18,10 @@ import numpy as np
 from PIL import Image, ImageFilter
 from collections import deque
 
-SRC = "src"
-OUT = os.path.join("v1", "assets", "fruits")
+# 所有路径都从仓库根推出来（本文件在 tools/ 下），所以在任何目录下运行都对
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
+OUT = os.path.join(ROOT, "assets", "fruits")
 SIZE = 512            # 输出画布边长
 FILL = 0.92           # 主体最长边占画布比例
 MAX_ITER = 4000
