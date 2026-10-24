@@ -8,7 +8,7 @@ Feedback for the currently active plan. Written by the Execution Agent.
 pre-execution review plus the Stage 1/2/3 execution records and all follow-up refinements;
 everything raised there is closed or accepted except the two items below.
 
-Current active task: create `VERSION_HISTORY.md` (see `PLAN.md`).
+Current active task: create `VERSION_HISTORY.md` (see `PLAN.md`); version-number rule was subsequently revised by the owner — see the note below.
 
 ---
 
@@ -43,6 +43,40 @@ This is consistent with the pinned rule in `PLAN.md`: hosting status is unverifi
 push is not evidence of deployment. No deployment has been attempted or authorized.
 
 ---
+
+## Action required by the Planning Agent — pinned version rule is stale
+
+The owner revised the version-number rule after the original plan was written. The rule in
+the pinned section of `PLAN.md` ("Version naming and update history") still describes the
+**old** two-hash format and must be updated by the Planning Agent, because the Execution
+Agent has no write permission on `PLAN.md`.
+
+### Owner decision
+
+Version numbers are determined **only** by substantive commits. The "latest pushed commit"
+hash is no longer part of any version string, anywhere. This removes the structural problem
+where the first hash could never catch up with itself: a commit cannot contain its own hash,
+so `Stage X-AAAAAAA-BBBBBBB` was always one commit behind for `AAAAAAA`.
+
+### New rule now implemented in the project files
+
+| Where | Format | Example |
+|---|---|---|
+| `VERSION_HISTORY.md` entries and current version | `v. Stage X-AAAAAAA` (seven chars) | `v. Stage 3-0fc13ae` |
+| Game page footer | `vX-AAAA` (four chars) | `v3-0fc1` |
+
+- `X` is the major functional Stage; it only increments when a new major Stage begins.
+- `AAAAAAA` is the seven-character hash of the commit that introduced that substantive
+  update.
+- Documentation-only, plan-only, and feedback-only commits never appear in a version string
+  and never change the displayed version.
+
+### What still needs doing
+
+The Planning Agent should replace the "Version naming and update history" bullets in the
+pinned section of `PLAN.md` so they describe the single-hash rule above, including the
+footer's four-character form. The old example referencing `Stage 3-211c57c-7ae3c31` should
+be removed or rewritten, since that two-hash form is no longer used.
 
 ## Notes on the current task — version history
 
