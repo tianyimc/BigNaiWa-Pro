@@ -2,12 +2,13 @@
 
 ## Execution contract
 
-This plan has two separately authorized stages.
+This plan records completed work and the next planned stage.
 
-1. **Stage 1 — Repository layout migration and site cleanup.** Complete only the repository, routing, documentation, tooling, tests, and leaderboard placeholder work specified below. When Stage 1 is complete, stop and report the diff and verification results. Do not start Stage 2 until the owner explicitly authorizes continuation.
-2. **Stage 2 — Additive gameplay updates.** Start only after explicit owner authorization following Stage 1 review. Implement the features in the sequence below without creating another mode or replacing the existing core loop.
+1. **Stage 1 — Repository layout migration and site cleanup.** Completed.
+2. **Stage 2 — Additive gameplay updates.** Implemented in the current repository; keep its documented feature specs as the behavior reference.
+3. **Stage 3 — Product identity, tutorial, revive economy, and sponsor removal.** Planned below; do not begin until the owner authorizes it.
 
-Do not combine the stages into one implementation or one commit. Keep each stage reviewable and commit only files belonging to that stage.
+Keep each stage reviewable and commit only files belonging to that stage.
 
 ## Project identity and public links
 
@@ -131,7 +132,7 @@ For each feature, update the existing Node self-check suite with observable beha
 
 ## Review response: `PLAN_FEEDBACK.md` and Stage 1 check
 
-This section responds to the post-execution review. The earlier feedback sections that describe the pre-migration layout are historical context; the outcomes below describe the current repository. Stage 2 remains unstarted and still requires explicit owner authorization.
+This section responds to the post-execution review. The earlier feedback sections that describe the pre-migration layout are historical context; the outcomes below describe the current repository. Stage 2 has since been implemented; Stage 3 is the next planned work and requires owner authorization.
 
 ### Rechecked in the current checkout
 
@@ -158,3 +159,49 @@ This section responds to the post-execution review. The earlier feedback section
 ### Stage 1 status
 
 The gameplay and path self-checks pass, the current root asset inventory is complete, and the reviewed migration behavior matches the intended layout. Remaining items are documentation/maintenance follow-ups (stale preview and line-ending policy) and environment/deployment limitations (asset regeneration dependencies and unknown hosting source); they are not failures of the tested gameplay runtime. Keep these follow-ups visible and do not infer deployment success from a Git push.
+
+## Stage 3 — Product identity, tutorial, revive economy, and sponsor removal
+
+This is the next additive update after the implemented Stage 2. Keep the existing board, physics, merge chain, and single-player run flow. Do not begin Stage 3 until the owner authorizes it.
+
+### 1. Remove sponsor functionality
+
+- Remove the settlement-screen “可以赏作者一包辣条嘛” button and sponsor dialog from `index.html`.
+- Remove sponsor event wiring and the sponsor script include. Remove `sponsor.js`, sponsor-only CSS, and `assets/sponsor-qr.jpg` if no other code or documentation uses them.
+- Remove sponsor-specific documentation and stale references. Do not replace the sponsor button with another monetization prompt.
+- Acceptance: no sponsor button, modal, QR image, sponsor script, or sponsor-only styling remains in the app; restart, leaderboard placeholder, and game flow still work.
+
+### 2. Change revive coin earning threshold
+
+- Change the score threshold for earning one revive coin from 2,000 to **1,500 points**.
+- Preserve cumulative and cross-threshold behavior: each newly crossed 1,500-point boundary grants exactly one coin. A score increase crossing multiple boundaries grants all newly reached coins once. The top-tier clear's separately granted revive coin remains unchanged.
+- Update all player-facing instructions and documentation that state the old threshold.
+- Acceptance tests: 1,499 points grants none; 1,500 grants one; 1,501 does not duplicate; 3,000 grants two total; a single score award crossing multiple thresholds grants the correct total; resetting a run resets the issuance counter.
+
+### 3. Rename the game and add a tutorial dialog
+
+- Change the visible game heading from **“合成大奶蛙”** to **“合成大奶蛙Pro”**. Update the browser title and relevant accessibility labels consistently.
+- Add a compact square `?` button aligned to the right side of the title row. Give it an accessible name such as “玩法教程”; ensure it does not crowd or overlap the title on narrow screens.
+- Clicking the button opens a tutorial dialog with a close button, keyboard accessibility, Escape-to-close, and sensible focus return. Follow existing modal conventions for backdrop behavior.
+- Teach basic controls: mouse aiming/click-to-drop; touch drag-to-aim/release-to-drop; current/next fruit preview; keyboard arrows/A-D, Space/Enter, and R; same-tier merges; the danger line and loss rule.
+- Explain current Pro features accurately: cascade timing and bonus, merge discovery, run statistics, danger-line recovery points/cap, directional finesse (`Shift+←/→` and touch flick), and both revive choices and costs. State the earning rate as one revive coin per 1,500 score.
+- Keep tutorial copy concise and segmented. Allow scrolling on small screens. Opening or using the tutorial must not trigger game controls or drop a fruit. Do not add a tutorial level or a new game mode.
+- Acceptance: the help button opens the dialog; close button, Escape, and focus behavior work; copy matches the implemented mechanics; the dialog fits 320×568 and 390×844 without horizontal overflow; interacting with the tutorial never drops a fruit.
+
+### 4. Add owner and original-author links at the page bottom
+
+- Add a small footer at the bottom of the page with two clearly labeled external links:
+  - **我的仓库 / Tianyimc:** `https://github.com/tianyimc/BigNaiWa-Pro`
+  - **原作者 / YHSome:** `https://github.com/YHSome/BigNaiWa`
+- Use safe new-tab links (`target="_blank"` and `rel="noopener noreferrer"`) with meaningful accessible labels. Do not add a live game URL.
+- Clarify that this repository is the Pro fork/continuation and that the original repository is by YHSome; do not imply that the original author created the Pro additions.
+- Acceptance: both links target the exact repositories above, are visible at the bottom on desktop and mobile, and do not cause horizontal overflow or obscure the board.
+
+### Stage 3 implementation order and regression checks
+
+1. Remove sponsor UI, assets, code, and documentation references.
+2. Change the revive threshold and all related copy; add boundary tests.
+3. Update the title and implement the accessible tutorial dialog with copy checked against actual mechanics.
+4. Add the two repository attribution links at the page bottom.
+5. Run all four existing Node self-checks (`physics.test.js`, `gameplay.test.js`, `name-filter.test.js`, and `stage2.test.js`), plus any tutorial test added for this stage. Smoke-check tutorial, revive prompt, and footer at 320×568, 390×844, and desktop width. Confirm Stage 2 behavior and the offline leaderboard placeholder remain intact.
+6. Review the diff for removed sponsor references and outdated 2,000-point instructions. Keep the work separate from prior stages.
