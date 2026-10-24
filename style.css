@@ -847,6 +847,22 @@ body {
   font-weight: 400;
 }
 
+/* 页脚里的版本号：等宽数字、弱化处理，不抢项目名的视觉重量。
+   外层包一层 inline-block，保证「| v. Stage 3-83f6」整组一起换行，
+   不会出现分隔符留在上一行末尾、版本号单独掉下去的难看情况。 */
+.foot-ver-wrap {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.foot-ver {
+  font-weight: 400;
+  font-size: 11px;
+  color: #a08871;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .page-foot a {
   color: #c8601a;
   font-weight: 700;

@@ -1,129 +1,112 @@
-# Version History
+# 版本历史
 
-Human-readable list of this repository's **substantive functional updates and fixes**.
+本仓库**实质功能更新与修复**的可读记录。
 
-## Format
+## 格式
 
 ```
 Stage X-AAAAAAA-AAAAAAA
 ```
 
-- `X` — the major functional Stage this update belongs to. It only increments when a
-  new major functional Stage begins; small changes and maintenance never increment it.
-- `AAAAAAA` — the seven-character abbreviated Git commit hash of the commit that
-  introduced the update. History entries use the **same hash in both positions**, because
-  an entry represents exactly one substantive commit.
-- The two-hash form with **different** hashes (`Stage X-AAAAAAA-BBBBBBB`) is only used to
-  describe the *current repository state*: first hash = latest pushed commit (functional or
-  not), second hash = latest pushed **substantive** commit. See "Current version" below.
+- `X` —— 该更新所属的功能大阶段。只有 owner 批准的计划开启新的功能大阶段时才递增；
+  小改动与维护性修改一律不递增。
+- `AAAAAAA` —— 引入该更新的 Git 提交的七位缩写哈希。历史条目**两侧哈希相同**，
+  因为一条条目就代表一个确定的实质提交。
+- 两侧哈希**不同**的写法（`Stage X-AAAAAAA-BBBBBBB`）只用于描述*当前仓库状态*：
+  第一个哈希 = 最新推送的提交（不论是否功能性），第二个哈希 = 最新推送的**实质**提交。
+  详见下方「当前版本」。
 
-**Only substantive functional changes get an entry here.** Documentation-only,
-plan-only, feedback-only, and other nonfunctional commits are excluded — they can advance
-the current version's first hash, but they never add or rewrite a history entry. Old
-entries are never rewritten to reflect later nonfunctional pushes.
+**只有实质功能改动才进本表。** 纯文档、纯计划、纯反馈等非功能性提交不收录 ——
+它们可以推进当前版本的第一个哈希，但永远不新增或改写历史条目。旧条目不会因为后续
+非功能推送而被改写。
 
-## Current version
+## 当前版本
 
 ```
 Stage 3-83f6c45-7ae3c31
 ```
 
-- `83f6c45` — latest pushed commit at the time of writing (a plan-only change).
-- `7ae3c31` — latest pushed substantive commit (see the Stage 3 entry below).
+- `83f6c45` —— 撰写时最新推送的提交（纯计划改动）。
+- `7ae3c31` —— 最新推送的实质提交（见下方 Stage 3 条目）。
 
-This string is documentation only. The game UI does not display a version label, and this
-task intentionally did not add one.
+游戏主页页脚显示的版本号采用四位缩写：`v. Stage 3-83f6`。
 
-## Entries
+## 历史条目
 
-### Stage 1-3c1a7bc-3c1a7bc — 2026-10-23
-
-Repository layout migration and site cleanup. Moved the active game from `v1/` to the
-repository root (6 application files plus 25 assets, recorded by Git as 100% renames), made
-root `index.html` the real game page, and turned `v1/index.html` into a compatibility
-redirect that preserves the query string and hash. Removed the stale canonical URL and all
-direct-play links. Disabled the online leaderboard completely behind an `ONLINE_ENABLED`
-switch: no reads, no score submissions, no retries, zero network requests, with the dialog
-showing 「正在完善中，敬请期待」; both `leaderboard.js` and `leaderboard.min.js` were kept.
-Anchored all four asset scripts to the repository root via `__file__` and repointed the test
-loaders at the root layout. Gameplay rules and balance were not changed.
-
-### Stage 2-a671b4c-a671b4c — 2026-10-23
-
-Additive gameplay update, six features on the existing drop/physics/merge/survival loop:
-
-- **Cascade detection** — a newly created fruit merged again within 600 ms with no player
-  drop in between extends the chain; unrelated merges restart at 1; a top-tier pair clear
-  ends the chain without counting.
-- **Run statistics** — highest cascade, highest tier reached, top-tier clears, danger
-  recoveries, revives used, shown as a compact two-column summary on the game-over panel
-  and reset each run.
-- **Cascade feedback and bonus** — `×N 连锁` float capped at `×5+`, scoring
-  `min(len-1, 5) × 5` (max +25) through a dedicated path that does not grant revive coins.
-- **Danger-line recovery** — a fruit that accumulates 0.5 s above the line and then falls
-  back or is merged away earns +30, once per fruit, capped at 3 per run, no revive coins.
-- **Optional drop-direction finesse** — `Shift+←/→` (±20 per press) and touch flick over the
-  final 120 ms, clamped to ±60 px/s against a 130 px/s drop velocity, with a cue arrow;
-  aim position is provably unaffected and `FINESSE_ENABLED` disables it.
-- **Two-tier revive** — 1 coin clears the top fruit plus everything above the line; 2 coins
-  clears the top three plus everything above the line, unioned so nothing is removed twice;
-  the wider tier is disabled with an explanation when the balance is short.
-
-Also added the merge discovery collection (`danaiwa.discovery.v1`, silhouettes for locked
-tiers, persists across runs, cosmetic only).
-
-### Stage 3-ed0b245-ed0b245 — 2026-10-24
-
-Product identity and onboarding update:
-
-- **Removed the sponsor feature entirely** — settlement-screen button, sponsor dialog,
-  `sponsor.js`, `assets/sponsor-qr.jpg`, and all sponsor-only CSS.
-- **Revive coin threshold 2,000 → 1,500 points**, with cumulative and multi-boundary
-  behaviour preserved and boundary tests added.
-- **Renamed the game to 合成大奶娃Pro** across the title, iOS web-app title, description,
-  canvas label, and heading; added a `?` tutorial button with an accessible dialog
-  (nine sections, Escape/backdrop close, focus moved in and returned on close, scrollable
-  at 320 px).
-- **Footer attribution** with owner and original-author links using
-  `target="_blank"` + `rel="noopener noreferrer"`.
-- **Fixed a pre-existing input bug** surfaced by the tutorial work: the global keydown and
-  pointer handlers did not check for an open dialog, so pressing Space or clicking the board
-  with the tutorial or leaderboard open dropped fruit behind the overlay.
-
-### Stage 3-81e9de1-81e9de1 — 2026-10-24
-
-Name correction and footer rewrite. The game had been misnamed 合成大奶**娃** since the
-initial import; corrected to 合成大奶**蛙** in 20 places (title, metadata, accessibility
-labels, heading, footer sentence, source-file headers, the `v1/` compatibility page, the
-README, and the test suite). Replaced the footer with the owner-specified two-line wording
-and made the three names links to the original-author repository, the author's site, and
-this repository respectively.
+> 按**先新后旧**排列。
 
 ### Stage 3-7ae3c31-7ae3c31 — 2026-10-24
 
-Copy and layout refinements. Changed the merge copy from 「两个同级别的水果」 to
-「两个同级别的奶蛙」 in the tutorial and README. Right-aligned the `?` button: on desktop
-via `space-between` plus `margin-right: auto` on the heading, and on narrow screens by
-moving the block to the end of the top info bar with `order` plus `justify-content: flex-end`
-(the heading is hidden there, so `space-between` had nothing to push against). Added four
-regression assertions so neither change can silently revert.
+文案与布局微调。教程与 README 中的合成说明由「两个同级别的水果」改为「两个同级别的
+奶蛙」。`?` 按钮改为右对齐：桌面端用 `space-between` 配合标题的 `margin-right: auto`；
+窄屏标题被隐藏后 `space-between` 失去对手，改用 `order` 把该块移到顶部信息条末端，
+并加 `justify-content: flex-end`。同时补了四条回归断言，防止两处改动被静默改回去。
 
-## Excluded commits (for reference)
+### Stage 3-81e9de1-81e9de1 — 2026-10-24
 
-Two commits change files that look functional but are not, so neither gets an entry:
+修正游戏名并重写页脚。游戏自首次导入起一直被误写成合成大奶**娃**，本次在全仓库
+20 处更正为合成大奶**蛙**：页面标题、元数据、无障碍标签、主标题、页脚句子、
+源码文件头注释、`v1/` 兼容页、README 与测试脚本。页脚改为 owner 指定的两行文案，
+并把三个名称分别做成指向原作者仓库、作者主页与本仓库的链接。
 
-- `e8bcaa7` (统一仓库行尾为 LF) touches `game.js`, `index.html`, `style.css` and others,
-  but every file was verified to differ **only in line endings** — the CR-stripped blobs are
-  identical. No behaviour changed.
-- `45406af` (刷新 preview.png) replaces the README screenshot and adds assertions to
-  `stage3.test.js`; it changes no application logic, markup, or styling.
+### Stage 3-ed0b245-ed0b245 — 2026-10-24
 
-Everything before `3c1a7bc` (roughly 40 commits, from the initial import `b947132` onward)
-predates Stage 1 and is intentionally not listed: the version format is keyed to Stage
-numbers, and those commits do not belong to any Stage.
+产品身份与新手指引更新：
 
-## Maintenance rule for future work
+- **彻底移除赞助功能** —— 结算页按钮、赞助弹窗、`sponsor.js`、
+  `assets/sponsor-qr.jpg` 以及全部赞助专用样式。
+- **复活币阈值 2000 → 1500 分**，保持累进与跨多阈值行为不变，并补齐边界测试。
+- **改名「合成大奶蛙Pro」**，同步页面标题、iOS 主屏名、description、画布标签与主标题；
+  新增 `?` 教程按钮与可访问弹窗（九段内容、Esc 与点遮罩关闭、焦点进入与归还、
+  320px 下可滚动）。
+- **页脚署名**，owner 与原作者链接均带 `target="_blank"` 与
+  `rel="noopener noreferrer"`。
+- **修复一个既有输入缺陷**（由教程工作暴露）：全局 keydown 与指针处理未判断
+  「是否有弹窗打开」，导致教程或排行榜开着时按空格、点棋盘仍会在遮罩背后掉落水果。
 
-Any future substantive implementation plan must append an entry here for each substantive
-functional update or fix, using the form `Stage X-<hash>-<same hash>`. Nonfunctional
-commits do not add entries.
+### Stage 2-a671b4c-a671b4c — 2026-10-23
+
+在既有投放/物理/合成/生存循环上做加法，共六项：
+
+- **连锁检测** —— 合成产出的新水果在 600ms 内再次被合成、且期间玩家未投放，
+  则延长连锁；不相干的合成重新从 1 开始；两只神奶蛙清场不产出水果，会结束连锁且不计数。
+- **局内统计** —— 最高连锁、最高等级、顶级清场、危险救回、用掉的复活币，
+  以两列紧凑排版展示在结算面板，每局重置。
+- **连锁反馈与奖励** —— 飘字 `×N 连锁`，最多显示 `×5+`；按 `min(长度-1, 5) × 5`
+  加分（上限 +25），走独立加分通道，**不发放复活币**。
+- **危险线救回** —— 同一颗水果在线上方累计满 0.5 秒后掉回线下或被合掉，记 +30 分；
+  每颗一次，每局最多 3 次，同样不发放复活币。
+- **可选投放方向微调** —— `Shift+←/→` 每次 ±20；触屏取拖动最后 120ms 的横向甩动；
+  上限 ±60 px/s（下落速度仍为 130），有冲量时显示提示箭头；瞄准位置经验证不受影响，
+  `FINESSE_ENABLED` 可整体关闭。
+- **两档复活** —— 1 枚清掉顶上 1 颗 + 线上方全部；2 枚清掉顶上 3 颗 + 线上方全部，
+  两个条件取并集，同一颗不会清两次；余额不足时宽档禁用并说明还差几枚。
+
+另外新增**合成图鉴**（`danaiwa.discovery.v1`，未解锁等级显示剪影，跨局保留，纯外观）。
+
+### Stage 1-3c1a7bc-3c1a7bc — 2026-10-23
+
+仓库布局迁移与站点清理。把活动游戏从 `v1/` 移到仓库根目录（6 个应用文件与 25 个资产，
+Git 全部识别为 100% 重命名），根 `index.html` 成为真正的游戏页，`v1/index.html`
+改为保留查询串与锚点的兼容跳转页。移除过期的 canonical 地址与全部直玩链接。
+把在线排行榜整体停用并收在 `ONLINE_ENABLED` 开关后：不读榜、不提交、不重试、
+零网络请求，弹窗显示「正在完善中，敬请期待」；`leaderboard.js` 与
+`leaderboard.min.js` 均保留。四个素材脚本改用 `__file__` 锚定仓库根，
+测试加载路径同步指向根布局。玩法规则与数值未改动。
+
+## 被排除的提交（备查）
+
+有两个提交的文件列表看着像功能改动，实际不是，因此都不进本表：
+
+- `e8bcaa7`（统一仓库行尾为 LF）改了 `game.js`、`index.html`、`style.css` 等，
+  但逐文件去掉 CR 后比对**完全一致**，只有行尾差异，行为未变。
+- `45406af`（刷新 preview.png）替换了 README 截图并给 `stage3.test.js` 加断言，
+  未改动任何应用逻辑、标记或样式。
+
+`3c1a7bc` 之前的约 40 个提交（自首次导入 `b947132` 起）早于 Stage 1，
+刻意不列入：版本格式以 Stage 编号为键，那些提交不属于任何 Stage。
+
+## 后续维护规则
+
+今后任何实质实现计划，都必须为每个实质功能更新或修复在本表追加一条条目，
+使用 `Stage X-<哈希>-<同一哈希>` 的形式。非功能提交不追加条目。

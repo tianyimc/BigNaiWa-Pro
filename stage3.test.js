@@ -369,6 +369,16 @@ if (fs.existsSync(pvPath)) {
   ok(buf.length < 1200 * 1024, '体积没有失控（<1200KB），实际 ' + Math.round(buf.length / 1024) + 'KB');
 }
 
+/* 页脚版本号：必须存在、格式为 v. Stage X-XXXX（四位哈希） */
+ok(html.indexOf('class="foot-ver"') >= 0, '页脚有版本号元素');
+/* class 属性在源码里可能被换行拆开，用宽松匹配 */
+const verMatch = html.match(/class="foot-ver"\s*>([^<]+)</);
+ok(!!verMatch, '能取到版本号文本');
+if (verMatch) {
+  const ver = verMatch[1].trim();
+  ok(/^v\. Stage \d+-[0-9a-f]{4}$/.test(ver), '版本号格式是 v. Stage X-XXXX（四位哈希），实际：' + ver);
+}
+
 /* README 顶部要引用它 */
 ok(html.length > 0 && /!\[预览\]\(preview\.png\)/.test(
   fs.readFileSync(path.join(root, 'README.md'), 'utf8')
