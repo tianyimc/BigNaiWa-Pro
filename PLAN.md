@@ -32,31 +32,14 @@ This section is durable project guidance. It stays at the top of `PLAN.md` and m
 
 ### Version naming and update history
 
-- Use the format **`Stage X-AAAAAAA-BBBBBBB`**, where each hash is the seven-character abbreviated Git commit hash.
-- `X` is the current major functional Stage. Increment it only when the owner-approved plan begins a new major functional Stage; small changes and maintenance do not increment it.
-- `AAAAAAA` is the hash of the latest commit pushed to the owner's repository, whether it contains functional changes or documentation/plan/feedback-only changes.
-- `BBBBBBB` is the hash of the latest pushed commit that contains a substantive functional change or substantive functional fix. A documentation-only, plan-only, feedback-only, or other nonfunctional commit updates the first hash only.
-- Example: after a documentation-only commit `abcdefg`, if the latest substantive commit is `7ae3c31`, the current version is `Stage 3-abcdefg-7ae3c31`. The owner's example `Stage 3-211c57c-7ae3c31` follows the same rule for the repository state at that point in history.
-- Create and maintain `VERSION_HISTORY.md` as the human-readable version update list. Record only substantive functional updates/fixes. Each entry's version must have equal hash fields (`Stage X-AAAAAAA-AAAAAAA`), because the entry represents the commit that introduced that substantive update. Do not add entries for documentation-only, plan-only, feedback-only, or other nonfunctional commits.
-- For historical entries, inspect Git history and summarize substantive changes only. For each future substantive update, append its version and a concise summary to `VERSION_HISTORY.md`. Do not rewrite old entries to reflect later documentation-only pushes; the current version's first hash can advance without changing the version-history list.
-- The Planning Agent maintains these rules in the pinned section. The Execution Agent creates/updates `VERSION_HISTORY.md` only when an active plan directs it to do so or when a substantive update is part of the authorized implementation task.
+- Version strings are determined **only by substantive functional commits or substantive functional fixes**. Documentation-only, plan-only, feedback-only, and other nonfunctional commits never appear in a version string and never change the displayed version.
+- The project/history version format is **`v. Stage X-AAAAAAA`**, where `X` is the major functional Stage and `AAAAAAA` is the seven-character abbreviated hash of the substantive commit. Example: `v. Stage 3-0fc13ae`.
+- The compact game-page footer format is **`vX-AAAA`**, using the same Stage and the first four characters of that substantive commit hash. Example: `v3-0fc1`.
+- Increment `X` only when a new major functional Stage begins under an owner-approved plan. Smaller improvements and fixes within a Stage keep the same `X` and use the hash of their own substantive commit.
+- Maintain `VERSION_HISTORY.md` as the human-readable list of substantive updates only. Each entry uses `v. Stage X-AAAAAAA` and summarizes the corresponding substantive commit. Do not include nonfunctional commits or pre-Stage history that has no Stage number.
+- For each future substantive implementation update/fix, the Execution Agent appends the corresponding version and concise summary to `VERSION_HISTORY.md` and updates the compact page-footer version if that task includes a substantive UI/code change. Documentation-only pushes do not change either version display or the history list.
+- The Planning Agent maintains these rules in this pinned section. The pinned section itself is never archived.
 
-## Active plan — create version history
+## Active plan
 
-This is a documentation task, not a new functional Stage.
-
-### Required work
-
-- Create `VERSION_HISTORY.md`.
-- Review Git history and add concise summaries for past substantive functional updates only. At minimum, identify the existing Stage 1 repository/gameplay baseline, Stage 2 gameplay additions, and Stage 3 product/tutorial updates. Use each substantive update commit's seven-character hash in both positions of the history entry version.
-- The latest substantive Stage 3 update currently identified by the owner is `7ae3c31`; verify it against Git history and use the actual substantive commit hash if the history shows a later substantive commit.
-- Add a short note at the top of `VERSION_HISTORY.md` explaining the format and that nonfunctional pushes do not receive history entries.
-- Future substantive implementation plans must require the Execution Agent to append a version-history entry for each substantive functional update/fix. The version entry must use equal hash components for that functional commit. Nonfunctional commits do not add entries.
-- Do not change the game's UI, README, version label, gameplay, or other files as part of this task. Do not create a new Stage.
-
-### Acceptance
-
-- `VERSION_HISTORY.md` exists and contains concise, accurate summaries of the repository's past substantive updates.
-- Every listed version matches `Stage X-<7-char hash>-<same 7-char hash>` and the hash resolves to the summarized substantive commit.
-- The current-version rule and the example remain documented in the pinned section of `PLAN.md`.
-- No functional code or UI is changed for this task.
+There is no active implementation task. The version-history task is complete and archived in `PLAN_ARCHIVED.md`. Wait for the owner to provide the next task before adding implementation requirements.

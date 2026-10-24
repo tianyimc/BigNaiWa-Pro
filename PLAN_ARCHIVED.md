@@ -229,3 +229,21 @@ Replace the README license-section wording with this exact Chinese text:
 Keep the existing README heading. Do not add a license file or modify unrelated README or application files. As part of execution, archive only resolved/closed feedback in `PLAN_FEEDBACK_ARCHIVED.md`, keeping unresolved feedback in `PLAN_FEEDBACK.md`.
 
 Acceptance was verified in commit `154caed`: the exact sentence appears in the README, and the execution report records the feedback archive housekeeping.
+
+---
+
+## 2026-10-25 — Create substantive version history (completed)
+
+The Execution Agent created `VERSION_HISTORY.md`, reconstructed the Stage 1–3 substantive update history, and updated the project version labels. The owner then revised the version format; the current rules are maintained in the pinned section of `PLAN.md`. The original two-hash requirements below are retained only as a historical snapshot and are superseded.
+
+### Completed plan snapshot (original requirements)
+
+- Create `VERSION_HISTORY.md` with concise summaries for past substantive functional updates, including Stage 1, Stage 2, and Stage 3. Exclude pre-Stage history and all documentation-only, plan-only, feedback-only, or other nonfunctional commits.
+- Use the substantive commit's short hash to identify each history entry. The original plan used a two-hash format; this was later replaced by the owner-approved single-hash rule in the pinned section of `PLAN.md`.
+- Add a format explanation to the history file and maintain it for future substantive functional updates.
+- Do not change gameplay or UI as part of the history-file task.
+
+### Completion evidence
+
+- `VERSION_HISTORY.md` exists and contains the substantive Stage 1–3 history.
+- Follow-up commits `d089f4d` and `3a926d3` implemented the owner's single-hash naming rule and synchronized the version history/page footer. The stale plan wording was identified in feedback and corrected in the pinned rules afterward.
