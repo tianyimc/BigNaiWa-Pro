@@ -5,10 +5,10 @@ Feedback for the currently active plan. Written by the Execution Agent.
 **Scope rule:** only unresolved/open items live in this file. Closed items are appended to
 `PLAN_FEEDBACK_ARCHIVED.md` with a dated heading. The latest archive entry
 (**Archived 2026-10-25 — Pre-execution review and Stage 1–3 records**) holds the full
-pre-execution review plus the Stage 1/2/3 execution records and all follow-up
-refinements; everything raised there is closed or accepted except the two items below.
+pre-execution review plus the Stage 1/2/3 execution records and all follow-up refinements;
+everything raised there is closed or accepted except the two items below.
 
-Current active task: README license wording (see `PLAN.md`).
+Current active task: create `VERSION_HISTORY.md` (see `PLAN.md`).
 
 ---
 
@@ -44,16 +44,52 @@ push is not evidence of deployment. No deployment has been attempted or authoriz
 
 ---
 
-## Notes on the current task
+## Notes on the current task — version history
 
-The active plan (`PLAN.md`) asks for a single README license-sentence replacement plus this
-feedback archive housekeeping. Both are executed in this turn; the file changes and the
-verification actually run are reported to the owner. Per the pinned rule, nothing is pushed
-unless the owner explicitly asks.
+`PLAN.md` asks for a new `VERSION_HISTORY.md` listing past substantive functional updates,
+using `Stage X-<hash>-<hash>` entries with equal hash fields, and explicitly excludes
+documentation-only, plan-only, and feedback-only commits.
 
-Two constraints from the pinned section were respected while doing this task:
+### Owner decisions taken before writing
 
-- Only `PLAN_FEEDBACK.md` and `PLAN_FEEDBACK_ARCHIVED.md` were written by the Execution
-  Agent for the feedback side of the work; `PLAN.md` and `PLAN_ARCHIVED.md` were read only.
-- The README edit touched the license sentence only. No application file, no other README
-  section, and no license file was added.
+Three points were ambiguous enough that they were confirmed with the owner first rather than
+decided unilaterally:
+
+1. **Stage 3 entry granularity** — Stage 3 contains three substantive commits
+   (`ed0b245`, `81e9de1`, `7ae3c31`). Owner chose **three separate entries**, one per
+   substantive commit, rather than collapsing them into one.
+2. **Pre-Stage-1 history** — roughly 40 commits predate Stage 1 (from the initial import
+   `b947132` onward). Owner chose **not** to list them, since the version format is keyed to
+   Stage numbers and those commits belong to no Stage.
+3. **Current version string** — the owner confirmed recording
+   `Stage 3-83f6c45-7ae3c31` at the top of the file, derived by the pinned rule
+   (first hash = latest pushed commit, second = latest substantive commit).
+
+### Substantive vs nonfunctional classification
+
+Five substantive commits were identified and verified to resolve in Git:
+
+| Version | Subject |
+|---|---|
+| `Stage 1-3c1a7bc-3c1a7bc` | Repository layout migration and site cleanup |
+| `Stage 2-a671b4c-a671b4c` | Six additive gameplay features |
+| `Stage 3-ed0b245-ed0b245` | Sponsor removal, 1,500 threshold, Pro rename, tutorial, footer |
+| `Stage 3-81e9de1-81e9de1` | Name correction 大奶娃 → 大奶蛙, footer rewrite |
+| `Stage 3-7ae3c31-7ae3c31` | Merge copy, `?` button right-alignment |
+
+Two commits look functional from their file lists but were verified nonfunctional and were
+therefore excluded — this is recorded in `VERSION_HISTORY.md` itself so the reasoning is not
+lost:
+
+- `e8bcaa7` touches `game.js`, `index.html`, `style.css` and others, but every file was
+  diffed with CR stripped and is **identical apart from line endings**.
+- `45406af` replaces `preview.png` and adds assertions to `stage3.test.js`; it changes no
+  application logic, markup, or styling.
+
+### Constraints respected
+
+- No game UI, README, gameplay, or other project file was changed; `git status` shows only
+  the new `VERSION_HISTORY.md`.
+- No version label was added to the game UI, per the plan's instruction.
+- `PLAN.md` and `PLAN_ARCHIVED.md` were read only, not written.
+- Nothing was pushed; the plan says not to push unless the owner asks.
