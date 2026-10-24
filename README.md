@@ -171,7 +171,7 @@ python -m http.server 8080
 | `stage3.test.js` | 教程 / 改名 / 页脚 / 赞助移除自检（`node stage3.test.js`） |
 | `v1/index.html` | 兼容跳转页：把旧的 `/v1/` 链接带到根页面，没有游戏代码 |
 | `v1/fd46d3bf08af562b46f4afcdd8134ffc.txt` | 微信网站验证文件（保留旧路径，根目录也有一份） |
-| `preview.png` | 预览图 |
+| `preview.png` | 预览图（1280×900，由无头浏览器截取的实际游戏画面） |
 
 ## 排行榜（当前：占位状态）
 

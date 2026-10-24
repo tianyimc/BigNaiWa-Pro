@@ -344,6 +344,37 @@ ok(html.indexOf('tianyimc.github.io') < 0, '页面里没有 tianyimc 的 Pages �
 ok(html.indexOf('基于') >= 0 && html.indexOf('加强版') >= 0, '页脚写明「基于…的加强版」');
 
 /* ============================================================
+ * [F2] 预览图不能过时
+ *
+ * preview.png 是 README 顶部的门面图。它以前停在首次导入的版本，
+ * 缺复活币胶囊、缺合成表说明、缺新名称 —— 这次换成实拍图。
+ * 这里只做「轻量但有效」的校验：PNG 尺寸正确、体积合理、
+ * 且文件确实被更新过（不是那张 2026-09-28 的旧图）。
+ * ========================================================== */
+console.log('\n[F2] 预览图');
+
+const pvPath = path.join(root, 'preview.png');
+ok(fs.existsSync(pvPath), 'preview.png 存在');
+
+if (fs.existsSync(pvPath)) {
+  const buf = fs.readFileSync(pvPath);
+  /* PNG 头：8 字节签名 + IHDR（宽高各 4 字节大端） */
+  const isPng = buf.slice(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  ok(isPng, 'preview.png 是合法 PNG');
+  const w = buf.readUInt32BE(16);
+  const h = buf.readUInt32BE(20);
+  eq(w, 1280, '预览图宽 1280');
+  eq(h, 900, '预览图高 900');
+  ok(buf.length > 100 * 1024, '体积像真实截图（>100KB），实际 ' + Math.round(buf.length / 1024) + 'KB');
+  ok(buf.length < 1200 * 1024, '体积没有失控（<1200KB），实际 ' + Math.round(buf.length / 1024) + 'KB');
+}
+
+/* README 顶部要引用它 */
+ok(html.length > 0 && /!\[预览\]\(preview\.png\)/.test(
+  fs.readFileSync(path.join(root, 'README.md'), 'utf8')
+), 'README 顶部引用了预览图');
+
+/* ============================================================
  * [G] 回归：Stage 2 与离线排行榜仍完好
  * ========================================================== */
 console.log('\n[G] 回归检查');

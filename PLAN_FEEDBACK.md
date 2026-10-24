@@ -747,3 +747,75 @@ Result: `stage3.test.js` **104 / 0** (was 99). Other suites unchanged
   documentation-only follow-up.
 - **9.3 Asset tooling** cannot run (no `numpy`/`Pillow`).
 - **9.5 Deployment chain** unverified.
+
+---
+
+# Part VII — `preview.png` refreshed (closes item 9.1)
+
+This closes the last outstanding item from Part II. The preview had been stale since the
+initial import and had drifted through every stage since.
+
+## 30. What was wrong with the old image
+
+`preview.png` was last written in `b947132` (2026-09-28), the initial import. By the time
+it was replaced it was missing **all** of the following:
+
+- the revive-coin chip (added in `43a92a4`),
+- the merge-chain note line (also `43a92a4`),
+- the `?` tutorial button (Stage 3),
+- the corrected name 合成大奶**蛙** (fix `81e9de1`),
+- the footer attribution block (Stage 3 / `81e9de1`),
+- the 1,500-point copy (Stage 3),
+- the run-statistics panel and discovery silhouettes (Stage 2).
+
+It also still showed the old tip block. In short, it was a screenshot of a game that no
+longer existed.
+
+## 31. How the new image was produced
+
+Reproducible, no manual retouching:
+
+1. `python3 -m http.server 8130 --bind 127.0.0.1` from the repo root;
+2. headless Chromium (Playwright) at `viewport 1280×900`, `deviceScaleFactor: 2`;
+3. `window.__DNW__` driven to build a natural pile — 20 scripted drops at staggered
+   x-positions, then 200 physics steps to settle;
+4. discovery collection pre-filled via `localStorage` so the merge chain shows real fruit
+   art instead of `?` silhouettes (the preview should show the art, not the locked state);
+5. floats / particles / flash cleared so no transient overlay text is frozen into the
+   screenshot;
+6. `current` fruit set to a mid-tier so nothing is pressing against the danger line;
+7. full-page screenshot at 2560×1800, then `convert -resize 1280x900 -filter Lanczos`
+   down to the documented size.
+
+Result: 1280×900 PNG, 8-bit RGB, **307 KB** (old file was 445 KB — smaller *and* at higher
+effective quality, because the old one was captured at 1× and upscaled in spirit).
+
+## 32. Verification
+
+`stage3.test.js` gained a `[F2]` section that parses the PNG header directly, so a future
+stale or broken image fails the suite:
+
+- file exists;
+- PNG signature is valid;
+- IHDR width **1280** and height **900**;
+- size between 100 KB and 1,200 KB (catches both placeholder stubs and runaway files);
+- README still references `![预览](preview.png)`.
+
+`stage3.test.js` is now **111 / 0** (was 104). Other suites unchanged: physics PASS,
+gameplay 48/0, name-filter 33/0, stage2 118/0.
+
+Visually confirmed in the committed image: correct name 合成大奶蛙Pro, the `?` button at
+the panel's right edge, the 1,500-point tip, the full 11-tier merge chain rendered with
+real sprites, and the new two-line footer with its three links.
+
+## 33. Status of every previously open item
+
+| Item | Status |
+|---|---|
+| 9.1 `preview.png` stale | **Closed** — this part |
+| 9.2 Line endings not enforced | **Closed** — `e8bcaa7` (`git add --renormalize .`) |
+| 9.3 Asset tooling cannot run | **Open** — needs `numpy` + `Pillow`; no stage has required them |
+| 9.5 Deployment chain unverified | **Open** — no deployment has been attempted or authorized |
+
+Nothing else from Part II remains. The two open items are environment/deployment facts,
+not defects in the repository.
