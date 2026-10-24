@@ -199,11 +199,13 @@ body {
 .title-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;   /* 标题靠左、? 按钮贴到右边缘 */
   gap: 8px;
 }
 
 .title-row h1 {
   min-width: 0;            /* 允许标题在极窄屏被压缩而不是把按钮挤出去 */
+  margin-right: auto;      /* 双保险：即使 h1 内容变短，按钮也始终在最右 */
 }
 
 .help-btn {
@@ -946,16 +948,19 @@ body {
   }
 
   /* 标题文字在顶部信息条里收起，但 ? 教程按钮必须留着 ——
-     否则窄屏玩家就没有入口看教程了。 */
+     否则窄屏玩家就没有入口看教程了。
+     用 order 把这块挪到信息条最右端（桌面端它是标题行的一部分，
+     窄屏下标题没了，只剩按钮，就该跟其他操作按钮排在一起靠右）。 */
   .panel-head {
     display: block;
     flex: 0 0 auto;
+    order: 9;
   }
 
   .panel-head h1,
   .subtitle { display: none; }
 
-  .title-row { gap: 0; }
+  .title-row { gap: 0; justify-content: flex-end; }
 
   .help-btn {
     width: 34px;

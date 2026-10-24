@@ -166,6 +166,10 @@ console.log('\n[C] ? 按钮与教程弹窗');
 ok(!!H, 'help.js 加载并导出 DanaiwaHelp');
 ok(html.indexOf('id="helpBtn"') >= 0, '页面里有 ? 教程按钮');
 ok(html.indexOf('aria-label="玩法教程"') >= 0, '? 按钮有可访问名「玩法教程」');
+/* ? 按钮和标题在同一个 .title-row 里，靠 space-between 贴右 */
+ok(html.indexOf('class="title-row"') >= 0, '标题与 ? 按钮在同一个 .title-row 容器里');
+ok(/class="title-row"[\s\S]*?id="helpBtn"/.test(html), '? 按钮在标题行内、排在标题之后');
+ok(/\.title-row\s*\{[^}]*justify-content:\s*space-between/.test(css), '标题行用 space-between 让 ? 贴右');
 ok(html.indexOf('id="helpModal"') >= 0, '页面里有教程弹窗');
 ok(html.indexOf('aria-labelledby="helpTitle"') >= 0, '弹窗用标题做 aria-labelledby');
 ok(html.indexOf('id="helpClose"') >= 0, '弹窗有关闭按钮');
@@ -234,6 +238,8 @@ ok(helpText.indexOf('±60 px/s') >= 0, '教程写了微调上限 ±60 px/s');
 ok(helpText.indexOf('1.5 秒') >= 0, '教程写了越线判负 1.5 秒');
 ok(helpText.indexOf('Shift') >= 0, '教程写了 Shift 组合键');
 ok(helpText.indexOf('500 分') >= 0, '教程写了神奶蛙 500 分');
+ok(html.indexOf('<b>同级别</b>的奶蛙碰到一起') >= 0, '教程里写的是「同级别的奶蛙」而不是「水果」');
+ok(helpText.indexOf('同级别的</b>的水果') < 0, '教程里不再出现「同级别的水果」');
 
 /* 文案里的数字要和代码常量对得上，防止以后改代码忘了改文案 */
 eq(G.CASCADE_WINDOW, 0.6, '代码里的连锁窗口确实是 0.6 秒');

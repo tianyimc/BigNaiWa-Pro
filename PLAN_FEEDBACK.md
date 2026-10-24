@@ -688,3 +688,62 @@ Implementation notes:
   documentation-only follow-up.
 - **9.3 Asset tooling** still cannot run (no `numpy`/`Pillow`).
 - **9.5 Deployment chain** still unverified.
+
+---
+
+# Part VI — Copy and layout refinements
+
+Two owner-requested refinements after the name correction. Both are cosmetic; no game
+logic changed.
+
+## 26. Merge copy: 水果 → 奶蛙
+
+The tutorial line and the README both said two same-tier **水果** merge. The game's
+characters are 奶蛙, so the copy now reads:
+
+- `index.html` tutorial: 「两个**同级别**的**奶蛙**碰到一起，合成高一级…」
+- `README.md` gameplay list: 「两个**同级别**的**奶蛙**碰到一起就合成为高一级…」
+
+Untouched on purpose: `README.md:366` (「同级别贴身即合」) and
+`physics.test.js:146` (「球对球回弹（不同级别）」) — those describe the collision
+mechanism generically, not the player-facing character.
+
+## 27. `?` button right-aligned
+
+- `.title-row` now uses `justify-content: space-between` plus `margin-right: auto` on the
+  `h1`, so the button sits flush against the panel's right edge on desktop
+  (measured gap to row edge: **0 px**).
+- On narrow screens the heading text is hidden, so `space-between` had nothing to push
+  against and the button stayed at the far left. Fixed with `order: 9` on `.panel-head`
+  so the block moves to the **right end** of the top info bar, and
+  `justify-content: flex-end` on the row. Measured gap to panel edge:
+  **9 px at 320**, **11 px at 390** — visually aligned with the other action buttons.
+
+Measured after the change (headless Chromium):
+
+| Viewport | `?` right edge | panel right edge | gap |
+|---|---|---|---|
+| 1280×900 | 995 | 1016 | 21 (equals panel padding) |
+| 320×568 | 303 | 312 | 9 |
+| 390×844 | 371 | 382 | 11 |
+
+No horizontal overflow at any width (`scrollWidth == innerWidth`).
+
+## 28. Regression coverage added
+
+`stage3.test.js` gained four assertions so these cannot silently regress:
+
+- tutorial contains `<b>同级别</b>的奶蛙碰到一起`;
+- tutorial no longer contains 「同级别的水果」;
+- `?` button lives inside `.title-row` and comes after the heading;
+- `.title-row` uses `justify-content: space-between`.
+
+Result: `stage3.test.js` **104 / 0** (was 99). Other suites unchanged
+(physics PASS, gameplay 48/0, name-filter 33/0, stage2 118/0).
+
+## 29. Still open
+
+- **9.1 `preview.png` is stale** — the only outstanding item; PLAN.md:152 keeps it a
+  documentation-only follow-up.
+- **9.3 Asset tooling** cannot run (no `numpy`/`Pillow`).
+- **9.5 Deployment chain** unverified.
