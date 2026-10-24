@@ -213,3 +213,19 @@ This is the next additive update after the implemented Stage 2. Keep the existin
 4. Add the two repository attribution links at the page bottom.
 5. Run all four existing Node self-checks (`physics.test.js`, `gameplay.test.js`, `name-filter.test.js`, and `stage2.test.js`), plus any tutorial test added for this stage. Smoke-check tutorial, revive prompt, and footer at 320×568, 390×844, and desktop width. Confirm Stage 2 behavior and the offline leaderboard placeholder remain intact.
 6. Review the diff for removed sponsor references and outdated 2,000-point instructions. Keep the work separate from prior stages.
+
+---
+
+## 2026-10-25 — README license wording and feedback archival (completed)
+
+The Execution Agent completed this maintenance task in commit `154caed`. The README now contains the owner-provided license wording, and resolved feedback was moved to `PLAN_FEEDBACK_ARCHIVED.md`; unresolved feedback remains active. The owner requested this plan snapshot be archived. The pinned operating rules remain only in the active `PLAN.md` and are intentionally not copied here.
+
+### Completed task snapshot
+
+Replace the README license-section wording with this exact Chinese text:
+
+> 仅供学习娱乐，不得以此盈利。由于原作者（YHSome）未在其仓库声明开源许可证，本仓库亦无法声明开源许可证，如有侵权，请联系解决。
+
+Keep the existing README heading. Do not add a license file or modify unrelated README or application files. As part of execution, archive only resolved/closed feedback in `PLAN_FEEDBACK_ARCHIVED.md`, keeping unresolved feedback in `PLAN_FEEDBACK.md`.
+
+Acceptance was verified in commit `154caed`: the exact sentence appears in the README, and the execution report records the feedback archive housekeeping.
