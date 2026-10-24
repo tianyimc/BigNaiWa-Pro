@@ -7,11 +7,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="合成大奶娃">
-<meta name="description" content="合成大奶娃 · 纯前端小游戏：拖动瞄准、松手投放，相同的撞在一起合成更大的一只。">
+<meta name="apple-mobile-web-app-title" content="合成大奶娃Pro">
+<meta name="description" content="合成大奶娃Pro · 纯前端小游戏：拖动瞄准、松手投放，相同的撞在一起合成更大的一只。">
 <!-- ↓ Monetag 站点验证：把后台给的 meta 标签粘在下面这一行 ↓ -->
 
-<title>合成大奶娃</title>
+<title>合成大奶娃Pro</title>
 <!-- 仓库：https://github.com/tianyimc/BigNaiWa-Pro
      不写 canonical：本仓库目前没有已确立的线上部署地址，避免写死一个过期链接。 -->
 <link rel="stylesheet" href="style.css">
@@ -22,7 +22,7 @@
 
   <!-- ===== 游戏区 ===== -->
   <section class="stage" id="stage">
-    <canvas id="game" aria-label="合成大奶娃游戏区域"></canvas>
+    <canvas id="game" aria-label="合成大奶娃Pro 游戏区域"></canvas>
 
     <!-- 复活币：浮在棋盘左上角。
          刻意不放进顶部信息条 —— 手机上面板是横向 flex，
@@ -94,7 +94,6 @@
           <div class="dialog-actions">
             <button class="btn" id="boardBtn2" type="button">🏆 排行榜</button>
             <button class="btn btn-primary" id="restartBtn" type="button">再来一局</button>
-            <button class="btn btn-sponsor btn-wide" id="sponsorBtn" type="button">🌶️ 可以赏作者一包辣条嘛</button>
           </div>
           <p class="dialog-hint">按 R 键也可重新开始</p>
         </div>
@@ -107,7 +106,11 @@
   <aside class="panel">
 
     <header class="panel-head">
-      <h1>合成大奶娃</h1>
+      <div class="title-row">
+        <h1>合成大奶娃Pro</h1>
+        <button class="help-btn" id="helpBtn" type="button"
+                aria-label="玩法教程" title="玩法教程" aria-haspopup="dialog">?</button>
+      </div>
       <p class="subtitle">相同的撞在一起，越合越大</p>
     </header>
 
@@ -148,12 +151,124 @@
     <p class="tips">
       鼠标：移动瞄准、点击投放；触屏：拖动瞄准、松手投放。<br>
       ← → 微调位置，空格投放，R 重开。<br>
-      每 <strong>2000 分</strong>攒一枚<strong>复活币</strong>，只在本局有效。
+      每 <strong>1500 分</strong>攒一枚<strong>复活币</strong>，只在本局有效。
     </p>
 
   </aside>
 
 </main>
+
+<!-- ===== 页脚：仓库与原作者 ===== -->
+<footer class="page-foot">
+  <p class="foot-line">
+    <span class="foot-tag">Pro 分支</span>
+    本仓库是「合成大奶娃」的 Pro 续作，在原作者版本上追加了连锁、图鉴、局内统计、
+    危险线救回、方向微调与两档复活等玩法。
+  </p>
+  <p class="foot-links">
+    <a href="https://github.com/tianyimc/BigNaiWa-Pro" target="_blank" rel="noopener noreferrer"
+       aria-label="打开我的仓库：Tianyimc / BigNaiWa-Pro（新标签页）">我的仓库 / Tianyimc</a>
+    <span class="foot-sep" aria-hidden="true">·</span>
+    <a href="https://github.com/YHSome/BigNaiWa" target="_blank" rel="noopener noreferrer"
+       aria-label="打开原作者仓库：YHSome / BigNaiWa（新标签页）">原作者 / YHSome</a>
+  </p>
+</footer>
+
+<!-- ===== 玩法教程弹窗 ===== -->
+<div class="modal" id="helpModal" aria-hidden="true" role="dialog"
+     aria-modal="true" aria-labelledby="helpTitle">
+  <div class="modal-card help-card">
+    <header class="modal-head">
+      <h2 id="helpTitle">📖 玩法教程</h2>
+      <button class="icon-btn" id="helpClose" type="button" aria-label="关闭教程">✕</button>
+    </header>
+
+    <div class="help-body">
+      <section class="help-sec">
+        <h3>怎么投</h3>
+        <ul>
+          <li><b>鼠标</b>：移动瞄准，点一下就投。</li>
+          <li><b>触屏</b>：按住拖动瞄准，<b>松手才投</b>，手指不会挡住落点。</li>
+          <li>棋盘右上角的「下一个」是下一颗；当前这颗画在虚线顶端。
+            冷却期间它会变淡，表示还不能投。</li>
+          <li>键盘：<b>← →</b> 或 <b>A D</b> 微调位置，<b>空格 / 回车</b> 投放，<b>R</b> 重开。</li>
+        </ul>
+      </section>
+
+      <section class="help-sec">
+        <h3>怎么合</h3>
+        <ul>
+          <li>两个<b>同级别</b>的水果碰到一起，合成高一级，并加分（三角数 1 / 3 / 6 … / 55）。</li>
+          <li>两只<b>神奶蛙</b>撞在一起会一起炸掉，换 <b>500 分</b> + <b>1 枚复活币</b>。</li>
+        </ul>
+      </section>
+
+      <section class="help-sec">
+        <h3>什么时候输</h3>
+        <ul>
+          <li>唯一判负条件：有水果<b>卡在警戒线上方并且基本停住</b>，累计超过 <b>1.5 秒</b>。</li>
+          <li>被弹起来飞过线的不算；贴着线上下反复弹也很难攒够。</li>
+        </ul>
+      </section>
+
+      <section class="help-sec">
+        <h3>连锁</h3>
+        <ul>
+          <li>合成出的新水果如果在 <b>0.6 秒</b>内又被合掉，而且中间你没投放过，就算接上一环。</li>
+          <li>连锁结束时飘 <code>×N 连锁</code>，按 <code>min(N-1, 5) × 5</code> 加分，<b>最多 +25</b>。</li>
+          <li>连锁奖励<b>不攒复活币</b>。你一投放，当前连锁立即结算。</li>
+        </ul>
+      </section>
+
+      <section class="help-sec">
+        <h3>危险线救回</h3>
+        <ul>
+          <li>某颗水果在线上方累计满 <b>0.5 秒</b>后，如果掉回线下或被合掉，记一次救回，<b>+30 分</b>。</li>
+          <li>同一颗只记一次，每局最多 <b>3 次</b>；救回奖励同样不攒复活币。</li>
+        </ul>
+      </section>
+
+      <section class="help-sec">
+        <h3>方向微调</h3>
+        <ul>
+          <li>键盘：<b>Shift + ← / →</b> 给一点投放方向，每次 ±20。</li>
+          <li>触屏：松手前快速横甩，取最后 <b>120 毫秒</b>的速度；慢慢挪不算。</li>
+          <li>上限 <b>±60 px/s</b>，只影响投放瞬间，<b>不会改变瞄准位置</b>，也不能替代瞄准。</li>
+        </ul>
+      </section>
+
+      <section class="help-sec">
+        <h3>复活币与两档复活</h3>
+        <ul>
+          <li>每累计 <b>1500 分</b>攒 1 枚复活币，只在本局有效。</li>
+          <li>越线判负时如果有币，会让你选：
+            <b>1 枚</b>清掉顶上 1 颗 + 线上方全部；<b>2 枚</b>清掉顶上 3 颗 + 线上方全部。</li>
+          <li>余额不足 2 枚时大范围档会变灰，并提示还差几枚。</li>
+        </ul>
+      </section>
+
+      <section class="help-sec">
+        <h3>合成图鉴</h3>
+        <ul>
+          <li>第一次合出某个等级就解锁它，记在本地，<b>跨局保留</b>。</li>
+          <li>没解锁的等级在合成表里显示为 <code>?</code> 剪影。图鉴纯外观，不影响概率和分数。</li>
+        </ul>
+      </section>
+
+      <section class="help-sec">
+        <h3>本局亮点</h3>
+        <ul>
+          <li>结束后会列出：最高连锁、最高等级、顶级清场、危险救回、用掉的复活币。</li>
+        </ul>
+      </section>
+    </div>
+
+    <footer class="modal-foot">
+      <span class="board-note">随时点标题旁的 ? 再看一遍</span>
+      <button class="btn" id="helpOk" type="button">知道了</button>
+    </footer>
+  </div>
+</div>
 
 <!-- ===== 排行榜弹窗 ===== -->
 <div class="modal" id="boardModal" aria-hidden="true" role="dialog" aria-label="排行榜">
@@ -175,35 +290,14 @@
   </div>
 </div>
 
-<!-- ===== 赞助作者弹窗 ===== -->
-<div class="modal" id="sponsorModal" aria-hidden="true" role="dialog" aria-label="赞助作者">
-  <div class="modal-card">
-    <header class="modal-head">
-      <h2>🌶️ 请作者吃包辣条</h2>
-      <button class="icon-btn" id="sponsorClose" type="button" aria-label="关闭">✕</button>
-    </header>
-    <div class="sponsor-body">
-      <p class="sponsor-note">这游戏完全免费，也没有任何广告。<br>
-        要是它逗你笑了一下，赏作者一包辣条呗 🌶️</p>
-      <img class="sponsor-qr" src="assets/sponsor-qr.jpg" width="480" height="480"
-           alt="微信收款码" loading="lazy" decoding="async">
-      <p class="sponsor-hint">微信扫一扫 · 一包辣条 · 全凭心意</p>
-    </div>
-    <footer class="modal-foot">
-      <span class="board-note">谢谢每一位投喂的玩家 ❤️</span>
-      <button class="btn" id="sponsorOk" type="button">关闭</button>
-    </footer>
-  </div>
-</div>
-
 <!-- 碰撞形状数据（按贴图轮廓自动生成，由 tools/build_parts.py 产出） -->
 <script src="assets/fruits/parts.js"></script>
 <!-- 极模糊占位图（内联 data URL，由 tools/make_blur.py 产出）：贴图没到位时先画它 -->
 <script src="assets/fruits/blur.js"></script>
 <script src="game.js"></script>
+<!-- 玩法教程弹窗 -->
+<script src="help.js"></script>
 <!-- 排行榜 -->
 <script src="leaderboard.min.js"></script>
-<!-- 赞助作者 -->
-<script src="sponsor.js"></script>
 </body>
 </html>

@@ -47,8 +47,13 @@ body {
     radial-gradient(900px 600px at 104% -6%,  #d5f0ff 0%, transparent 55%),
     radial-gradient(1000px 780px at 50% 118%, #ffdbe6 0%, transparent 62%),
     #fff9f1;
-  display: grid;
-  place-items: center;
+  /* 纵向排：游戏区在上、页脚在下。用 flex 而不是 grid，
+     这样页脚是「按内容高度」的第二行，不会把棋盘挤成两半。 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   overflow: hidden;
   touch-action: manipulation;          /* 干掉双击缩放 */
   -webkit-tap-highlight-color: transparent;
@@ -62,13 +67,15 @@ body {
   align-items: stretch;
   gap: 20px;
   max-height: 100%;
+  min-height: 0;              /* 让棋盘能在矮屏里收缩，页脚才不会被顶出去 */
+  flex: 0 1 auto;
 }
 
 /* ---------------- 游戏区 ---------------- */
 
 .stage {
   position: relative;
-  height: min(86vh, 700px);
+  height: min(calc(100vh - 150px), 700px);   /* 150px ≈ 页脚 + 间距 + body padding */
   aspect-ratio: 420 / 700;
   flex: 0 0 auto;
   border-radius: 24px;
@@ -161,87 +168,6 @@ body {
   color: var(--ink-soft);
 }
 
-/* ---------------- 赞助作者弹窗 ---------------- */
-
-.sponsor-body {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  text-align: center;
-}
-
-.sponsor-note {
-  margin: 0 0 14px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--ink-soft);
-}
-
-.sponsor-qr {
-  display: block;
-  width: min(258px, 70vw);
-  height: auto;
-  margin: 0 auto;
-  padding: 6px;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 6px 20px rgba(140, 96, 56, .18);
-}
-
-.sponsor-hint {
-  margin: 12px 0 0;
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-/* 结算弹窗里的「赏作者一包辣条」：要一眼看到，但别跟主按钮抢
-   —— 用琥珀金（跟珊瑚红的主按钮区分开），加一道缓慢扫过的光，再叠一点亮度呼吸。
-   注意选择器写成 .btn.btn-sponsor：这段在源码里排在 .btn 之前，
-   单靠 .btn-sponsor 会被后面的 .btn 同权重覆盖掉。 */
-.btn.btn-sponsor {
-  position: relative;
-  overflow: hidden;
-  color: #5a3200;
-  font-weight: 800;
-  letter-spacing: .01em;
-  border-color: transparent;
-  background: linear-gradient(135deg, #ffd97a, #ffb020 52%, #f78f00);
-  box-shadow: 0 8px 22px rgba(244, 150, 0, .42), inset 0 1px 0 rgba(255, 255, 255, .5);
-  animation: sponsorPulse 2.6s ease-in-out infinite;
-}
-
-.btn.btn-sponsor:hover {
-  transform: translateY(-2px) scale(1.012);
-  box-shadow: 0 12px 30px rgba(244, 150, 0, .52), inset 0 1px 0 rgba(255, 255, 255, .55);
-}
-.btn.btn-sponsor:active { transform: translateY(1px) scale(.99); }
-
-/* 一道光周期性地扫过去，提示「这里可以点」 */
-.btn-sponsor::after {
-  content: "";
-  position: absolute;
-  top: -20%;
-  bottom: -20%;
-  width: 42%;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .78), transparent);
-  transform: translateX(-150%) skewX(-20deg);
-  animation: sponsorSheen 3.2s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes sponsorPulse {
-  0%, 100% { filter: brightness(1) saturate(1); }
-  50%      { filter: brightness(1.09) saturate(1.12); }
-}
-
-@keyframes sponsorSheen {
-  0%, 55%   { transform: translateX(-150%) skewX(-20deg); }
-  82%, 100% { transform: translateX(330%) skewX(-20deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .btn.btn-sponsor, .btn-sponsor::after { animation: none; }
-}
-
 /* ---------------- 侧边面板 ---------------- */
 
 .panel {
@@ -266,6 +192,48 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* 标题行：标题 + 右侧的 ? 教程按钮。
+   用 flex 让按钮永远贴在标题右边；窄屏时标题可以缩，按钮不缩。 */
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-row h1 {
+  min-width: 0;            /* 允许标题在极窄屏被压缩而不是把按钮挤出去 */
+}
+
+.help-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(214, 160, 96, .5);
+  background: rgba(255, 255, 255, .85);
+  color: #a4622a;
+  font: 800 15px/1 system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+  transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.help-btn:hover {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(200, 140, 80, .28);
+  transform: scale(1.08);
+}
+
+.help-btn:active { transform: scale(.96); }
+
+.help-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .subtitle {
@@ -794,6 +762,111 @@ body {
 
 .modal-foot .btn { flex: 0 0 auto; padding: 8px 16px; }
 
+/* ---------------- 玩法教程弹窗 ---------------- */
+
+/* 教程内容比排行榜长得多，所以卡片要能滚，且别撑破屏幕 */
+.help-card {
+  max-height: min(620px, calc(var(--vh) - 32px));
+}
+
+.help-body {
+  flex: 1 1 auto;
+  min-height: 0;                 /* flex 子项能真正收缩，否则滚不动 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 6px;
+  text-align: left;
+}
+
+.help-sec { margin: 0 0 12px; }
+
+.help-sec:last-child { margin-bottom: 4px; }
+
+.help-sec h3 {
+  margin: 0 0 5px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #c8601a;
+  letter-spacing: .02em;
+}
+
+.help-sec ul {
+  margin: 0;
+  padding-left: 17px;
+}
+
+.help-sec li {
+  margin: 0 0 3px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.help-sec li:last-child { margin-bottom: 0; }
+
+.help-sec b { color: #a4622a; }
+
+.help-sec code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  background: rgba(214, 160, 96, .16);
+  color: #8a5420;
+}
+
+/* ---------------- 页脚：仓库与原作者 ---------------- */
+
+.page-foot {
+  width: min(680px, 92vw);
+  margin: 10px auto 0;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.foot-line {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.foot-tag {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #ff8a5c, #ff5f6d);
+  vertical-align: 1px;
+}
+
+.foot-links {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.foot-links a {
+  color: #c8601a;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(200, 96, 26, .35);
+}
+
+.foot-links a:hover { border-bottom-color: #c8601a; }
+
+.foot-links a:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.foot-sep {
+  margin: 0 6px;
+  opacity: .6;
+}
+
 /* ---------------- 参数提示 ---------------- */
 
 .tips {
@@ -811,7 +884,10 @@ body {
    ============================================================ */
 
 @media (max-width: 860px) {
-  :root { --topbar: 68px; }   /* 顶部信息条 + 间隙的大致占高 */
+  :root {
+    --topbar: 68px;   /* 顶部信息条 + 间隙的大致占高 */
+    --foot: 52px;     /* 页脚 + 间隙的大致占高 */
+  }
 
   body {
     padding: calc(8px + var(--safe-t)) calc(8px + var(--safe-r))
@@ -836,12 +912,33 @@ body {
      margin:auto 让它在剩下的空间里垂直居中 */
   .stage {
     margin: auto 0;
-    height: min(calc(var(--vh) - var(--topbar) - 28px - var(--safe-t) - var(--safe-b)),
+    /* --foot 是页脚预留高度：窄屏页脚会折行，多留一点 */
+    height: min(calc(var(--vh) - var(--topbar) - var(--foot) - 28px - var(--safe-t) - var(--safe-b)),
                 calc(96vw * 700 / 420));
     width: auto;
     max-height: none;
     border-radius: 20px;
   }
+
+  /* 窄屏页脚：字更小、更紧凑，不抢棋盘空间 */
+  .page-foot {
+    width: 100%;
+    max-width: calc(96vw * 700 / 420);
+    margin: 0;
+  }
+
+  .foot-line {
+    font-size: 10.5px;
+    line-height: 1.55;
+    margin-bottom: 3px;
+    /* 说明文字在窄屏最多两行，超出省略，避免把棋盘挤小 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .foot-links { font-size: 11px; }
 
   /* ---- 顶部信息条 ---- */
   .panel {
@@ -856,7 +953,25 @@ body {
     -webkit-backdrop-filter: blur(10px);
   }
 
-  .panel-head,
+  /* 标题文字在顶部信息条里收起，但 ? 教程按钮必须留着 ——
+     否则窄屏玩家就没有入口看教程了。 */
+  .panel-head {
+    display: block;
+    flex: 0 0 auto;
+  }
+
+  .panel-head h1,
+  .subtitle { display: none; }
+
+  .title-row { gap: 0; }
+
+  .help-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 17px;
+    background: rgba(255, 255, 255, .9);
+  }
+
   .next-box,
   .chain-box,
   .tips { display: none; }
@@ -877,7 +992,12 @@ body {
     box-shadow: 0 2px 8px rgba(140, 96, 56, .12);
   }
 
-  .stat-label { font-size: 10px; letter-spacing: .08em; }
+  /* 加了 ? 按钮之后顶部条更挤，「最高分」这种三字标签容易被压成两行 */
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: .04em;
+    white-space: nowrap;
+  }
 
   .stat-value {
     margin-top: 0;
@@ -982,7 +1102,7 @@ body {
 
   .stat-value { font-size: 17px; }
 
-  .stat-label { font-size: 9px; }
+  .stat-label { font-size: 9px; letter-spacing: 0; white-space: nowrap; }
 
   .btn { min-height: 44px; padding: 0 10px; font-size: 13px; }
 

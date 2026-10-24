@@ -1,7 +1,10 @@
-# 合成大奶娃
+# 合成大奶娃Pro
 
 纯 **HTML + CSS + JavaScript** 的静态网页小游戏，零依赖、零构建、离线可玩。
 物理引擎（PBD 位置约束求解）是自己写的，没有引入 matter.js 等任何第三方库。
+
+这是「合成大奶娃」的 **Pro 续作**：在原作者版本的基础上追加了连锁、合成图鉴、
+局内统计、危险线救回、方向微调、两档复活、玩法教程等玩法。
 
 ## 仓库
 
@@ -21,6 +24,7 @@
 - 两个**同级别**的碰到一起就合成为高一级，并获得分数。
 - 顶上虚线是**警戒线**：有水果**卡在线的上方并且基本停住**、累计超过 1.5 秒即判负
   （被弹起来飞过线的不算，详见下面的「失败规则」）。
+- 标题旁边的 **`?`** 按钮随时打开**玩法教程**（Esc 或点空白处关闭）。
 - 结束后结算面板会列出**本局亮点**：最高连锁、最高等级、顶级清场、危险救回、用掉的复活币。
 - 排行榜目前是**占位状态**（显示「正在完善中，敬请期待」，不发任何网络请求）。
 - `←` `→` 微调位置，`Space` / `Enter` 投放，`R` 重新开始。
@@ -125,7 +129,7 @@ for (const b of balls) {
 余额不足 2 枚时大范围档会**变灰禁用**，并提示还差几枚；「不了，结束吧」永远可用。
 复活后越线计时清零，接着玩。
 
-复活币每累计 **2000 分**发一枚，只在本局有效（重开清零）。
+复活币每累计 **1500 分**发一枚，只在本局有效（重开清零）。
 
 ## 运行
 
@@ -153,7 +157,6 @@ python -m http.server 8080
 | `game.js` | 游戏逻辑 + 自研物理 + Canvas 渲染 + WebAudio 音效 |
 | `leaderboard.js` | 排行榜源码（TinyWebDB 接口 + 弹窗渲染 + 昵称屏蔽词） |
 | `leaderboard.min.js` | 页面实际引用的排行榜副本（手工与 `leaderboard.js` 同步，**不是**自动构建产物） |
-| `sponsor.js` | 结算页「赞助作者」弹窗（展示微信收款码），纯静态、无网络请求 |
 | `assets/fruits/` | 水果贴图：`*.png` 是 512×512 的源图，页面实际加载的是 `*.webp`；另有 `parts.js` 碰撞形状、`blur.js` 极模糊占位图 |
 | `tools/normalize_assets.py` | 素材统一脚本：抠底、去噪、统一画布、烤暗边 |
 | `tools/optimize_sprites.py` | 把源图压成 WebP 并裁到每级实际需要的尺寸（1.45 MB → 0.19 MB） |
@@ -164,6 +167,8 @@ python -m http.server 8080
 | `gameplay.test.js` | 复活 / 清场玩法自检（`node gameplay.test.js`） |
 | `name-filter.test.js` | 排行榜界面 + 昵称屏蔽词 + 离线占位自检（`node name-filter.test.js`） |
 | `stage2.test.js` | 连锁 / 局内统计 / 图鉴 / 危险线救回 / 方向微调 / 复活二选一自检（`node stage2.test.js`） |
+| `help.js` | 玩法教程弹窗：开关、焦点管理与 Escape 关闭，不触碰游戏状态 |
+| `stage3.test.js` | 教程 / 改名 / 页脚 / 赞助移除自检（`node stage3.test.js`） |
 | `v1/index.html` | 兼容跳转页：把旧的 `/v1/` 链接带到根页面，没有游戏代码 |
 | `v1/fd46d3bf08af562b46f4afcdd8134ffc.txt` | 微信网站验证文件（保留旧路径，根目录也有一份） |
 | `preview.png` | 预览图 |
@@ -394,6 +399,7 @@ node gameplay.test.js        # 复活币发放 / 越线询问屏 / revive() / �
 node name-filter.test.js     # 排行榜界面 + 昵称屏蔽词 + 离线占位（33 项，默认测 min 版）
 node name-filter.test.js leaderboard.js   # 同样的断言跑一遍源码版
 node stage2.test.js          # 连锁 / 统计 / 图鉴 / 救回 / 微调 / 复活二选一（118 项）
+node stage3.test.js          # 教程 / 改名 / 页脚 / 赞助移除（92 项）
 ```
 
 三个脚本都在仓库根目录，直接 `node <文件名>` 即可；它们各自读取根目录的
@@ -472,8 +478,14 @@ Stage 2 新增（同样在 `game.js` 顶部）：
 
 ## 作者与仓库
 
-- 原始作者 / 维护者：**Tianyimc**
-- 规范仓库：**<https://github.com/tianyimc/BigNaiWa-Pro>**
+| 角色 | 仓库 |
+| --- | --- |
+| **本仓库（Pro 续作）** / Tianyimc | <https://github.com/tianyimc/BigNaiWa-Pro> |
+| **原作者** / YHSome | <https://github.com/YHSome/BigNaiWa> |
+
+本仓库是 **Pro 分支**，在原作者 YHSome 的版本之上追加了 Stage 2 / Stage 3 的玩法
+（连锁、图鉴、局内统计、危险线救回、方向微调、两档复活、教程）。
+**原作者的仓库里没有这些 Pro 追加内容**，两者请分别看待。
 
 上面「参考的开源项目」只是玩法与水果链设计的参考对象，**没有**参与本仓库
 原创实现的编写，也不对本仓库的内容负责。

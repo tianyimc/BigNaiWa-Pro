@@ -479,3 +479,128 @@ splitting them retroactively would produce commits that neither build nor test c
 their own. Stage 2 is still fully separate from the Stage 1 commit, as the execution
 contract requires. If per-feature history is needed for review, say so and the changes can
 be split into a stacked series instead.
+
+---
+
+# Part IV — Stage 3 execution record
+
+Authorized by the owner. All four Stage 3 items are implemented, plus one extra fix that
+the Stage 3 requirements forced out into the open.
+
+## 17. What was implemented
+
+### 17.1 Sponsor removal
+
+- Deleted `sponsor.js` and `assets/sponsor-qr.jpg` (git-tracked removal).
+- Removed the settlement-screen button, the whole sponsor modal, the `<script>` include,
+  and all sponsor-only CSS (`.sponsor-body/.note/.qr/.hint`, `.btn.btn-sponsor`,
+  `@keyframes sponsorPulse/sponsorSheen`, the reduced-motion override).
+- Removed the `sponsor*` DOM stubs from `gameplay.test.js` and the `sponsor.js` row from
+  the README file table.
+- Verified: `grep -ri sponsor` over `*.js/*.html/*.css/*.md` (excluding PLAN files) returns
+  nothing, and `stage3.test.js` asserts both files are gone and the page never mentions
+  辣条/收款码.
+
+### 17.2 Revive threshold 2,000 → 1,500
+
+- `REVIVE_STEP = 1500` in `game.js`; comments updated.
+- Player-facing copy updated in `index.html` (sidebar tip) and `README.md`.
+- `gameplay.test.js` section [A] rewritten to the plan's exact boundary list:
+  1,499 → 0; 1,500 → 1; 1,501 → no duplicate; 3,000 → 2; a single award crossing four
+  boundaries (3,000 → 9,000) → 6 total; `reviveGiven` matches; badge text `×6`;
+  reset clears the issuance counter.
+- The top-tier clear's separate coin is untouched (still granted by
+  `MAX_MERGE_GIVES_REVIVE`).
+
+### 17.3 Rename + tutorial dialog
+
+- Visible heading, `<title>`, `apple-mobile-web-app-title`, `<meta description>`, and the
+  canvas `aria-label` all say **合成大奶娃Pro**.
+- New `?` button (`#helpBtn`, `aria-label="玩法教程"`, `aria-haspopup="dialog"`) sits in a
+  `.title-row` flex container right of the heading. On narrow screens the heading text is
+  hidden but the button is kept and enlarged to 34×34 — otherwise mobile players would
+  have no tutorial entry point at all.
+- New `help.js` module (no game state, no input dispatch) + `#helpModal` markup with nine
+  sections: controls, merging, loss rule, cascade, danger recovery, finesse, revive coins
+  and both revive tiers, discovery collection, run statistics.
+- Accessibility: `role="dialog"`, `aria-modal="true"`, `aria-labelledby="helpTitle"`,
+  `aria-hidden` toggling, close button with `aria-label="关闭教程"`, Escape to close,
+  backdrop click to close, focus moved into the dialog on open and **returned to the
+  previously focused element on close**.
+- Scrolling: `.help-body` is the only scroll container (`overflow-y:auto` + `min-height:0`
+  so the flex child can actually shrink), card capped at `min(620px, 100dvh - 32px)`.
+
+### 17.4 Footer attribution
+
+- `.page-foot` with a short line stating this is the **Pro 分支/续作**, and two links:
+  - 我的仓库 / Tianyimc → `https://github.com/tianyimc/BigNaiWa-Pro`
+  - 原作者 / YHSome → `https://github.com/YHSome/BigNaiWa`
+- Both use `target="_blank"` + `rel="noopener noreferrer"` + descriptive `aria-label`.
+- No live-play URL was added.
+
+## 18. The bug Stage 3 surfaced (fixed)
+
+`stage3.test.js` originally asserted that pressing Space/Enter inside the tutorial must not
+drop a fruit — a hard requirement in PLAN.md:188. **It failed.** `game.js`'s global
+`keydown` handler had no notion of an open dialog, so typing in the tutorial dropped fruit
+behind the overlay. The same hole existed for the leaderboard modal.
+
+Fix: added `isModalOpen()` to `game.js`, checked at the top of the global `keydown`
+handler and at the top of the `pointermove`/`pointerdown` stage handlers. It inspects
+`helpModal`, `boardModal`, and `sponsorModal` (the latter is now gone but the guard is
+harmless and keeps the helper correct if a dialog returns).
+
+This is a real pre-existing defect that Stage 2 shipped: opening the leaderboard and
+pressing Space would drop a fruit. It is now covered by assertions in both directions —
+blocked while open, and **working again after close**, so the guard cannot silently
+disable input forever.
+
+## 19. Measured results
+
+| Check | Result |
+|---|---|
+| `node physics.test.js` | PASS |
+| `node gameplay.test.js` | 48 / 0 (was 47; the 1,500 boundary block added one assertion) |
+| `node name-filter.test.js` | 33 / 0 |
+| `node stage2.test.js` | 118 / 0 |
+| `node stage3.test.js` (new) | **92 / 0** |
+| Desktop 1280×900 | title/`?`/footer all present, `scrollWidth == 1280`, stage height 700 |
+| 320×568 | `?` visible, footer visible, `scrollWidth == 320` (no overflow), stage 420 |
+| 390×844 | same, stage 624 |
+| Tutorial desktop | 378×617 card, 9 sections, scrollable, focus lands on `helpClose` |
+| Tutorial 320 | 288×536 card, fits, scrollable |
+| Tutorial 390 | 358×621 card, fits, scrollable |
+| Escape close | closes, `aria-hidden` back to `true` |
+| Tutorial opens → ball count | unchanged (0 → 0) |
+| `file://` | title correct, 11/11 sprites, tutorial opens |
+| External network requests | **0** |
+| Sponsor leftovers | none (`grep -ri sponsor` empty) |
+
+## 20. Deviations and notes
+
+1. **`?` button kept on narrow screens, heading hidden.** The pre-existing mobile layout
+   hid `.panel-head` entirely to save vertical space. Keeping the whole header would have
+   wasted the top bar; hiding the button would have removed the tutorial entry on phones.
+   Only the button survives, enlarged for touch.
+2. **Layout changed from `display:grid` to `display:flex` on `body`.** The footer is a new
+   third block; with `place-items:center` grid it competed with the board for space. Now
+   the board is `flex: 0 1 auto` and the footer is a content-height row, and the mobile
+   stage height subtracts a `--foot` allowance so the board still fits without scrolling.
+3. **`sponsorModal` stays in the `isModalOpen()` list** even though the modal no longer
+   exists. Deliberate: the check is a lookup on `getElementById`, so a missing element is
+   simply skipped, and leaving the id in means the guard stays correct if the dialog ever
+   returns.
+4. **Desktop board height changed** from `min(86vh, 700px)` to
+   `min(calc(100vh - 150px), 700px)` to reserve room for the footer. On a 900 px-tall
+   viewport this still yields the full 700 px board, so nothing visibly shrank.
+5. **README reframed as a Pro fork** and the attribution table now lists both repositories,
+   with an explicit sentence that the original repository does **not** contain the Pro
+   additions.
+
+## 21. Still open
+
+- **9.1 `preview.png` is stale** — now also missing the `?` button, the footer, and the
+  1,500-point copy. PLAN.md:152 keeps this a documentation-only follow-up; it is the last
+  outstanding item from Part II.
+- **9.3 Asset tooling** still cannot run (no `numpy`/`Pillow`); Stage 3 did not need it.
+- **9.5 Deployment chain** still unverified; no deployment attempted.

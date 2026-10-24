@@ -621,16 +621,16 @@ console.log('\n[H] 回归检查');
 
 G.reset();
 eq(G.state.revives, 0, '开局 0 枚复活币');
-G.addScore(2000);
-eq(G.state.revives, 1, '普通加分的攒币逻辑不变（2000 分 → 1 枚）');
-G.addScore(2000);
-eq(G.state.revives, 2, '4000 分 → 2 枚');
+G.addScore(1500);
+eq(G.state.revives, 1, '普通加分的攒币逻辑不变（1500 分 → 1 枚）');
+G.addScore(1500);
+eq(G.state.revives, 2, '3000 分 → 2 枚');
 
 /* 普通合成仍然攒币 */
 G.reset();
-G.addScore(1999);
+G.addScore(1499);
 forceMerge(210, 600, 0);          // 合出 1 级 → +1 分
-eq(G.state.revives, 1, '普通合成跨过 2000 分 → 照常发币');
+eq(G.state.revives, 1, '普通合成跨过 1500 分 → 照常发币');
 
 console.log('\n' + pass + ' 通过 / ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

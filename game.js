@@ -33,7 +33,7 @@
                              //  而且它同时清掉两块最大的水果、相当于救一条命，值这个价）
   const MAX_MERGE_GIVES_REVIVE = true;  // 两只神奶蛙一起炸掉时，额外送一枚复活币
   const FREEZE_MS = 130;     // 清场时的定格，让这一下有重量
-  const REVIVE_STEP = 2000;  // 每累计多少分，发一枚复活币
+  const REVIVE_STEP = 1500;  // 每累计多少分，发一枚复活币
   const MERGE_PAD = 0.8;     // 合成判定的接触容差（px）
 
   /* —— 连锁（cascade）——
@@ -259,7 +259,7 @@
     over: false,
     flash: 0,
     revives: 0,        // 本局还剩几枚复活币（重开清零）
-    reviveGiven: 0,    // 本局已经发放过几次（用来判断跨过新的 2000 分）
+    reviveGiven: 0,    // 本局已经发放过几次（用来判断跨过新的 1500 分）
     freeze: 0,         // 命中定格剩余秒数
 
     /* —— 连锁状态（每局重置）——
@@ -658,7 +658,7 @@
     if (state.particles.length > 420) state.particles.splice(0, state.particles.length - 420);
   }
 
-  /* 复活币胶囊：有币才显示，跨过 2000 分时弹一下。
+  /* 复活币胶囊：有币才显示，跨过 1500 分时弹一下。
      注意 0 枚时也要把文字刷成 ×0 —— 否则下次显示出来的是上一次的旧数字。 */
   function paintRevives(pop) {
     if (!reviveBadge) return;
@@ -705,7 +705,7 @@
     grantRevives();
   }
 
-  /* 只加分数，不走「每 2000 分发复活币」那条路。
+  /* 只加分数，不走「每 1500 分发复活币」那条路。
      连锁奖励和危险线救回都用它 —— 这两笔钱不该加速攒币。 */
   function addBonusScore(n, x, y, text) {
     state.score += n;
@@ -1663,14 +1663,14 @@
   }
 
   stage.addEventListener('pointermove', (e) => {
-    if (state.over) return;
+    if (state.over || isModalOpen()) return;
     if (e.pointerType === 'touch' && !touchAiming) return;
     moveAim(pointerToX(e.clientX));
     if (e.pointerType === 'touch') trackTouch(pointerToX(e.clientX));
   });
 
   stage.addEventListener('pointerdown', (e) => {
-    if (state.over) return;
+    if (state.over || isModalOpen()) return;
     Sound.ensure();
     moveAim(pointerToX(e.clientX));
     if (e.pointerType === 'touch') {
@@ -1715,8 +1715,21 @@
     return tag === 'input' || tag === 'textarea' || t.isContentEditable === true;
   }
 
+  /* 有弹窗打开时，游戏按键一律让路。
+     教程弹窗里按空格/回车/方向键绝不能投放水果（PLAN Stage 3 的硬要求）；
+     排行榜、赞助这类弹窗同理 —— 开着弹窗还在背后掉水果是明显的 bug。 */
+  function isModalOpen() {
+    const ids = ['helpModal', 'boardModal', 'sponsorModal'];
+    for (let i = 0; i < ids.length; i++) {
+      const m = document.getElementById(ids[i]);
+      if (m && m.classList && m.classList.contains('show')) return true;
+    }
+    return false;
+  }
+
   window.addEventListener('keydown', (e) => {
     if (isTyping(e)) return;
+    if (isModalOpen()) return;
 
     /* Shift + ←/→：只调方向微调，不动瞄准位置 */
     if (FINESSE_ENABLED && e.shiftKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {

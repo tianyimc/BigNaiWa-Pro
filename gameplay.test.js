@@ -3,7 +3,7 @@
  *  运行：node gameplay.test.js
  *
  *  覆盖：
- *    · 每累计 2000 分发一枚复活币（跨阈值、不重复发、可累计）
+ *    · 每累计 1500 分发一枚复活币（跨阈值、不重复发、可累计）
  *    · 复活币只在本局有效，reset() 清零
  *    · 越线时有次数才弹询问屏，没次数直接结算
  *    · revive()：消耗一次、清掉警戒线以上的水果、解除判负、没次数返回 false
@@ -48,8 +48,7 @@ const els = {};
  'soundBtn', 'resetBtn', 'restartBtn', 'revivePrompt', 'overPanel', 'reviveScore',
  'reviveLeft', 'reviveBtn', 'giveUpBtn', 'reviveBadge', 'reviveCount',
  'boardBtn', 'boardBtn2', 'boardModal', 'boardList', 'boardClose', 'boardRefresh',
- 'nickInput', 'myNameLabel', 'submitBtn', 'submitBox', 'submitMsg', 'editNameBtn',
- 'sponsorModal', 'sponsorBtn', 'sponsorClose', 'sponsorOk'
+ 'nickInput', 'myNameLabel', 'submitBtn', 'submitBox', 'submitMsg', 'editNameBtn'
 ].forEach((id) => { els[id] = makeEl(id); });
 els.revivePrompt.hidden = true;
 els.overPanel.hidden = false;
@@ -102,22 +101,29 @@ const ball = (y, r) => ({ x: 200, y, r: r || 30, dead: false, landed: true, over
 console.log('玩法自检：复活 + 清场\n');
 
 /* ---------- A. 复活发放 ---------- */
-console.log('[A] 每 2000 分发一枚复活币');
+console.log('[A] 每 1500 分发一枚复活币');
 G.reset();
+eq(G.REVIVE_STEP, 1500, '阈值是 1500 分（Stage 3 从 2000 调低）');
 eq(G.state.revives, 0, '开局 0 次');
-G.addScore(1999);
-eq(G.state.revives, 0, '1999 分还是 0 次');
+
+/* 边界：1499 → 0；1500 → 1；1501 → 不重复 */
+G.addScore(1499);
+eq(G.state.revives, 0, '1499 分还是 0 次');
 G.addScore(1);
-eq(G.state.revives, 1, '到 2000 分 → 1 次');
+eq(G.state.revives, 1, '到 1500 分 → 1 次');
 G.addScore(1);
-eq(G.state.revives, 1, '2001 分不会重复发');
-G.addScore(1999);
-eq(G.state.revives, 2, '到 4000 分 → 2 次');
-G.addScore(2500);
-eq(G.state.revives, 3, '一次跨两个阈值（6500 分）→ 3 次');
-eq(G.state.reviveGiven, 3, '已发放次数对得上');
+eq(G.state.revives, 1, '1501 分不会重复发');
+
+/* 继续攒：3000 → 共 2 枚 */
+G.addScore(1499);
+eq(G.state.revives, 2, '到 3000 分 → 2 枚');
+
+/* 一次跨多个阈值：3000 → 9000 应再给 4 枚（1500×6=9000），共 6 枚 */
+G.addScore(6000);
+eq(G.state.revives, 6, '一次跨 4 个阈值（3000 → 9000）→ 共 6 枚');
+eq(G.state.reviveGiven, 6, '已发放次数对得上');
 eq(els.reviveBadge.hidden, false, '徽章显示出来了');
-eq(els.reviveCount.textContent, '×3', '胶囊文案正确');
+eq(els.reviveCount.textContent, '×6', '胶囊文案正确');
 
 /* ---------- B. 只在本局有效 ---------- */
 console.log('\n[B] 复活币只在本局有效');
@@ -139,12 +145,12 @@ eq(gameOverCalls, 1, '成绩已提交');
 
 G.reset();
 gameOverCalls = 0;
-G.addScore(2000);
+G.addScore(1500);                 // 刚好一枚
 G.state.balls = [ball(600), ball(300), ball(120)];
 G.gameOver();
 eq(els.revivePrompt.hidden, false, '有次数 → 弹询问屏');
 eq(els.overPanel.hidden, true, '结算屏让位');
-eq(els.reviveScore.textContent, 2000, '询问屏显示本局得分');
+eq(els.reviveScore.textContent, 1500, '询问屏显示本局得分');
 eq(els.reviveLeft.textContent, '还剩 1 枚', '显示剩余枚数');
 eq(gameOverCalls, 0, '还没提交成绩');
 
