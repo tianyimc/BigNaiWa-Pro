@@ -1,9 +1,9 @@
-# 合成大奶娃Pro
+# 合成大奶蛙Pro
 
 纯 **HTML + CSS + JavaScript** 的静态网页小游戏，零依赖、零构建、离线可玩。
 物理引擎（PBD 位置约束求解）是自己写的，没有引入 matter.js 等任何第三方库。
 
-这是「合成大奶娃」的 **Pro 续作**：在原作者版本的基础上追加了连锁、合成图鉴、
+这是「合成大奶蛙」的 **Pro 续作**：在原作者版本的基础上追加了连锁、合成图鉴、
 局内统计、危险线救回、方向微调、两档复活、玩法教程等玩法。
 
 ## 仓库
@@ -478,12 +478,16 @@ Stage 2 新增（同样在 `game.js` 顶部）：
 
 ## 作者与仓库
 
-| 角色 | 仓库 |
+> 合成大奶蛙Pro | 基于 YHSome 的加强版合成大奶蛙小游戏
+> By [tianyimc.com](https://tianyimc.com) （开放源代码）
+
+| 角色 | 地址 |
 | --- | --- |
-| **本仓库（Pro 续作）** / Tianyimc | <https://github.com/tianyimc/BigNaiWa-Pro> |
+| **本仓库（Pro 加强版）** / Tianyimc | <https://github.com/tianyimc/BigNaiWa-Pro> |
+| 作者主页 | <https://tianyimc.com> |
 | **原作者** / YHSome | <https://github.com/YHSome/BigNaiWa> |
 
-本仓库是 **Pro 分支**，在原作者 YHSome 的版本之上追加了 Stage 2 / Stage 3 的玩法
+本仓库是 **Pro 加强版**，在原作者 YHSome 的版本之上追加了 Stage 2 / Stage 3 的玩法
 （连锁、图鉴、局内统计、危险线救回、方向微调、两档复活、教程）。
 **原作者的仓库里没有这些 Pro 追加内容**，两者请分别看待。
 

@@ -604,3 +604,87 @@ disable input forever.
   outstanding item from Part II.
 - **9.3 Asset tooling** still cannot run (no `numpy`/`Pillow`); Stage 3 did not need it.
 - **9.5 Deployment chain** still unverified; no deployment attempted.
+
+---
+
+# Part V — Stage 3 follow-up: name correction and footer copy
+
+Owner review of Stage 3 found a **name error that had been in the repository since the
+initial import**: the game is 「合成大奶**蛙**」 (frog), not 「合成大奶**娃**」 (baby). Every
+occurrence has been corrected, and the footer copy was replaced with the owner's exact
+wording.
+
+## 22. The name error
+
+`娃` appeared in 20 places across the codebase. All are now `蛙`:
+
+| File | Occurrences fixed |
+|---|---|
+| `index.html` | `<title>`, `apple-mobile-web-app-title`, `<meta description>`, canvas `aria-label`, `<h1>`, footer sentence (6) |
+| `style.css` | file header comment (1) |
+| `game.js` | file header comment (1) |
+| `help.js` | file header comment (1) |
+| `leaderboard.js` | file header comment (1) |
+| `v1/index.html` | `<title>` and redirect body text (2) |
+| `README.md` | H1 and positioning sentence (2) |
+| `stage3.test.js` | its own assertions and labels (6) |
+
+Verification: `grep -rn 大奶娃` over `*.html/*.js/*.css/*.md` (excluding `PLAN.md` and this
+file) returns **nothing**; `stage3.test.js` asserts the page title, `h1`, iOS title, and
+canvas label all read 「合成大奶蛙Pro」, and the browser check reports
+`document.body.innerHTML.indexOf('大奶娃') === -1`.
+
+Note: the misspelling is present in the upstream history and in earlier stages, so it was
+**not introduced by Stage 3** — Stage 3 inherited it and only renamed the `Pro` suffix on
+top of the wrong character. Worth flagging because the wrong name was also used as the
+project's public title.
+
+## 23. Footer copy replaced
+
+The owner supplied exact wording; the footer now renders exactly two lines:
+
+```
+合成大奶蛙Pro | 基于 YHSome 的加强版合成大奶蛙小游戏
+By tianyimc.com （开放源代码）
+```
+
+Implementation notes:
+
+- The names are links rather than plain text, so the footer still satisfies the Stage 3
+  requirement for repository attribution while reading as a single sentence:
+  - `YHSome` → `https://github.com/YHSome/BigNaiWa`
+  - `tianyimc.com` → `https://tianyimc.com`
+  - `开放源代码` → `https://github.com/tianyimc/BigNaiWa-Pro`
+- All three keep `target="_blank"` + `rel="noopener noreferrer"` + `aria-label`.
+- `tianyimc.com` was verified before linking: it resolves, answers `301` to
+  `https://www.tianyimc.com/`, and that host returns `200` with title
+  "YIMC — Personal Digital Space". So the link is live, not a guess.
+- The previous `.foot-line` / `.foot-links` / `.foot-tag` classes were replaced by
+  `.foot-main` / `.foot-by`; the old class names are gone from both HTML and CSS, and the
+  narrow-screen overrides were rewritten to match.
+- `stage3.test.js` section [F] was rewritten: it now extracts the `<footer>` fragment,
+  asserts the exact two-line wording, asserts **three** links (not two), and re-checks
+  `target` / `rel` / `aria-label` on each.
+
+## 24. Verified after the change
+
+| Check | Result |
+|---|---|
+| `node physics.test.js` | PASS |
+| `node gameplay.test.js` | 48 / 0 |
+| `node name-filter.test.js` | 33 / 0 |
+| `node stage2.test.js` | 118 / 0 |
+| `node stage3.test.js` | **99 / 0** (was 92; footer block grew) |
+| Desktop 1280×900 | footer text exact, 3 links correct, `scrollWidth == 1280`, board 700px |
+| 320×568 | footer fully visible (`bottom 560 / vh 568`), `scrollWidth == 320`, board 420px |
+| 390×844 | footer visible (`bottom 836 / vh 844`), `scrollWidth == 390`, board 624px |
+| `大奶娃` in rendered DOM | absent on all three viewports |
+| Page errors / console errors | none |
+
+## 25. Still open
+
+- **9.1 `preview.png` is stale** — now also missing the `?` button, the corrected name,
+  and the new footer. This remains the only outstanding item, and PLAN.md:152 keeps it a
+  documentation-only follow-up.
+- **9.3 Asset tooling** still cannot run (no `numpy`/`Pillow`).
+- **9.5 Deployment chain** still unverified.

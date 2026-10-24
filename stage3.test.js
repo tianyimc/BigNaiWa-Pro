@@ -3,13 +3,13 @@
  *  运行：node stage3.test.js
  *
  *  覆盖：
- *    · 标题/元数据/无障碍标签都已改成「合成大奶娃Pro」
+ *    · 标题/元数据/无障碍标签都已改成「合成大奶蛙Pro」
  *    · ? 按钮存在、有可访问名、能打开教程弹窗
  *    · 关闭按钮 / 「知道了」/ Escape / 点遮罩 都能关
  *    · 焦点：打开时进入弹窗，关闭后回到原来的元素
  *    · 教程文案与实际机制一致（连锁 0.6s、救回 0.5s/3 次、1500 分、两档复活）
  *    · 打开/使用教程不会投放水果
- *    · 页脚两个外链指向正确仓库，且带 noopener noreferrer
+ *    · 页脚文案与 owner 指定的一致，外链指向正确目标且带 noopener noreferrer
  *    · 赞助功能已彻底移除
  * ============================================================ */
 'use strict';
@@ -150,13 +150,13 @@ ok(html.indexOf('id="boardBtn"') >= 0, '面板里的排行榜入口还在');
 /* ============================================================
  * [B] 改名与元数据
  * ========================================================== */
-console.log('\n[B] 改名为「合成大奶娃Pro」');
+console.log('\n[B] 改名为「合成大奶蛙Pro」');
 
-ok(/<title>合成大奶娃Pro<\/title>/.test(html), '浏览器标题已改成 Pro');
-ok(html.indexOf('apple-mobile-web-app-title" content="合成大奶娃Pro"') >= 0, 'iOS 主屏标题已改成 Pro');
-ok(html.indexOf('aria-label="合成大奶娃Pro 游戏区域"') >= 0, '画布无障碍标签已改成 Pro');
-ok(/<h1>合成大奶娃Pro<\/h1>/.test(html), '页面大标题已改成 Pro');
-ok(html.indexOf('<h1>合成大奶娃</h1>') < 0, '旧标题（不带 Pro）已不存在');
+ok(/<title>合成大奶蛙Pro<\/title>/.test(html), '浏览器标题已改成 Pro');
+ok(html.indexOf('apple-mobile-web-app-title" content="合成大奶蛙Pro"') >= 0, 'iOS 主屏标题已改成 Pro');
+ok(html.indexOf('aria-label="合成大奶蛙Pro 游戏区域"') >= 0, '画布无障碍标签已改成 Pro');
+ok(/<h1>合成大奶蛙Pro<\/h1>/.test(html), '页面大标题已改成 Pro');
+ok(html.indexOf('<h1>合成大奶蛙</h1>') < 0, '旧标题（不带 Pro）已不存在');
 
 /* ============================================================
  * [C] ? 按钮与教程弹窗
@@ -302,26 +302,40 @@ eq(G.state.balls.length, ballsBefore + 1, '关掉教程后鼠标投放恢复正�
 console.log('\n[F] 页脚：仓库与原作者');
 
 ok(html.indexOf('class="page-foot"') >= 0, '页面底部有页脚');
-ok(html.indexOf('https://github.com/tianyimc/BigNaiWa-Pro') >= 0, '页脚有我的仓库链接');
-ok(html.indexOf('https://github.com/YHSome/BigNaiWa"') >= 0, '页脚有原作者仓库链接');
-ok(html.indexOf('我的仓库 / Tianyimc') >= 0, '我的仓库链接有文字标签');
-ok(html.indexOf('原作者 / YHSome') >= 0, '原作者链接有文字标签');
 
-/* 两个链接都必须是安全的新标签打开 */
-const linkMatches = html.match(/<a [^>]*href="https:\/\/github\.com\/[^"]*"[^>]*>/g) || [];
-eq(linkMatches.length, 2, '页脚正好两个外链');
+/* 页脚文案（与 owner 指定的两行一致）：
+   合成大奶蛙Pro | 基于YHSome的加强版合成大奶蛙小游戏
+   By tianyimc.com （开放源代码） */
+ok(/合成大奶蛙Pro/.test(html), '页脚第一行以「合成大奶蛙Pro」开头');
+ok(html.indexOf('的加强版合成大奶蛙小游戏') >= 0, '页脚第一行写明「加强版…小游戏」');
+ok(html.indexOf('tianyimc.com') >= 0, '页脚有作者主页 tianyimc.com');
+ok(html.indexOf('开放源代码') >= 0, '页脚标注「开放源代码」');
+
+/* 链接目标 */
+ok(html.indexOf('https://github.com/tianyimc/BigNaiWa-Pro') >= 0, '有我的仓库链接');
+ok(html.indexOf('https://github.com/YHSome/BigNaiWa"') >= 0, '有原作者仓库链接');
+ok(html.indexOf('href="https://tianyimc.com"') >= 0, '有作者主页链接');
+
+/* 页脚里的每个外链都必须是安全的新标签打开 */
+const footHtml = (function () {
+  const m = html.match(/<footer class="page-foot">[\s\S]*?<\/footer>/);
+  return m ? m[0] : '';
+})();
+ok(footHtml.length > 0, '能截出页脚片段');
+const linkMatches = footHtml.match(/<a [^>]*>/g) || [];
+ok(linkMatches.length >= 3, '页脚至少有 3 个链接（原作者 / 作者主页 / 开源仓库），实际 ' + linkMatches.length);
 linkMatches.forEach((tag, i) => {
-  ok(/target="_blank"/.test(tag), '第 ' + (i + 1) + ' 个链接带 target="_blank"');
-  ok(/rel="noopener noreferrer"/.test(tag), '第 ' + (i + 1) + ' 个链接带 rel="noopener noreferrer"');
-  ok(/aria-label=/.test(tag), '第 ' + (i + 1) + ' 个链接有可访问名');
+  ok(/target="_blank"/.test(tag), '页脚第 ' + (i + 1) + ' 个链接带 target="_blank"');
+  ok(/rel="noopener noreferrer"/.test(tag), '页脚第 ' + (i + 1) + ' 个链接带 rel="noopener noreferrer"');
+  ok(/aria-label=/.test(tag), '页脚第 ' + (i + 1) + ' 个链接有可访问名');
 });
 
 /* 不能出现线上直玩地址 */
 ok(html.indexOf('yhsome.github.io') < 0, '页面里没有线上直玩地址');
 ok(html.indexOf('tianyimc.github.io') < 0, '页面里没有 tianyimc 的 Pages 地址');
 
-/* 页脚说明要讲清是 Pro 续作，不能暗示原作者做了 Pro 功能 */
-ok(html.indexOf('Pro 续作') >= 0 || html.indexOf('Pro 分支') >= 0, '页脚说明了这是 Pro 分支/续作');
+/* 页脚要讲清这是基于原作者的加强版，不能暗示原作者做了 Pro 功能 */
+ok(html.indexOf('基于') >= 0 && html.indexOf('加强版') >= 0, '页脚写明「基于…的加强版」');
 
 /* ============================================================
  * [G] 回归：Stage 2 与离线排行榜仍完好

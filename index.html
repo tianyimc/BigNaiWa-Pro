@@ -7,11 +7,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="合成大奶娃Pro">
-<meta name="description" content="合成大奶娃Pro · 纯前端小游戏：拖动瞄准、松手投放，相同的撞在一起合成更大的一只。">
+<meta name="apple-mobile-web-app-title" content="合成大奶蛙Pro">
+<meta name="description" content="合成大奶蛙Pro · 纯前端小游戏：拖动瞄准、松手投放，相同的撞在一起合成更大的一只。">
 <!-- ↓ Monetag 站点验证：把后台给的 meta 标签粘在下面这一行 ↓ -->
 
-<title>合成大奶娃Pro</title>
+<title>合成大奶蛙Pro</title>
 <!-- 仓库：https://github.com/tianyimc/BigNaiWa-Pro
      不写 canonical：本仓库目前没有已确立的线上部署地址，避免写死一个过期链接。 -->
 <link rel="stylesheet" href="style.css">
@@ -22,7 +22,7 @@
 
   <!-- ===== 游戏区 ===== -->
   <section class="stage" id="stage">
-    <canvas id="game" aria-label="合成大奶娃Pro 游戏区域"></canvas>
+    <canvas id="game" aria-label="合成大奶蛙Pro 游戏区域"></canvas>
 
     <!-- 复活币：浮在棋盘左上角。
          刻意不放进顶部信息条 —— 手机上面板是横向 flex，
@@ -107,7 +107,7 @@
 
     <header class="panel-head">
       <div class="title-row">
-        <h1>合成大奶娃Pro</h1>
+        <h1>合成大奶蛙Pro</h1>
         <button class="help-btn" id="helpBtn" type="button"
                 aria-label="玩法教程" title="玩法教程" aria-haspopup="dialog">?</button>
       </div>
@@ -158,19 +158,18 @@
 
 </main>
 
-<!-- ===== 页脚：仓库与原作者 ===== -->
+<!-- ===== 页脚：项目署名 ===== -->
 <footer class="page-foot">
-  <p class="foot-line">
-    <span class="foot-tag">Pro 分支</span>
-    本仓库是「合成大奶娃」的 Pro 续作，在原作者版本上追加了连锁、图鉴、局内统计、
-    危险线救回、方向微调与两档复活等玩法。
-  </p>
-  <p class="foot-links">
-    <a href="https://github.com/tianyimc/BigNaiWa-Pro" target="_blank" rel="noopener noreferrer"
-       aria-label="打开我的仓库：Tianyimc / BigNaiWa-Pro（新标签页）">我的仓库 / Tianyimc</a>
-    <span class="foot-sep" aria-hidden="true">·</span>
+  <p class="foot-main">
+    合成大奶蛙Pro<span class="foot-sep" aria-hidden="true">|</span>基于
     <a href="https://github.com/YHSome/BigNaiWa" target="_blank" rel="noopener noreferrer"
-       aria-label="打开原作者仓库：YHSome / BigNaiWa（新标签页）">原作者 / YHSome</a>
+       aria-label="打开原作者仓库：YHSome / BigNaiWa（新标签页）">YHSome</a>的加强版合成大奶蛙小游戏
+  </p>
+  <p class="foot-by">
+    By <a href="https://tianyimc.com" target="_blank" rel="noopener noreferrer"
+          aria-label="打开作者主页 tianyimc.com（新标签页）">tianyimc.com</a>
+    （<a href="https://github.com/tianyimc/BigNaiWa-Pro" target="_blank" rel="noopener noreferrer"
+        aria-label="打开开源仓库：Tianyimc / BigNaiWa-Pro（新标签页）">开放源代码</a>）
   </p>
 </footer>
 
