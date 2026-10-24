@@ -376,7 +376,7 @@ const verMatch = html.match(/class="foot-ver"\s*>([^<]+)</);
 ok(!!verMatch, '能取到版本号文本');
 if (verMatch) {
   const ver = verMatch[1].trim();
-  ok(/^v\. Stage \d+-[0-9a-f]{4}$/.test(ver), '版本号格式是 v. Stage X-XXXX（四位哈希），实际：' + ver);
+  ok(/^v\d+-[0-9a-f]{4}$/.test(ver), '版本号格式是 vX-AAAA（四位哈希），实际：' + ver);
 }
 
 /* README 顶部要引用它 */
