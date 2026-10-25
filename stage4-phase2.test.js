@@ -675,5 +675,22 @@ eq(els['cnt-shield'].textContent, '1/1', '菜单显示护盾 1/1');
 eq(els['btn-fan'].disabled, true, '0 个风扇 → 菜单项禁用');
 eq(els['btn-hammer'].disabled, false, '有锤子 → 菜单项可用');
 
+/* ============================================================
+ * [N] 按钮布局一致性
+ *
+ * 「道具」按钮外面包了一层 .item-menu-wrap（用于定位悬浮菜单）。
+ * 如果这层容器没撑满网格单元，按钮右侧就会留出一条空隙，
+ * 看起来像「道具」和「音效」之间有莫名其妙的间距。
+ * ========================================================== */
+console.log('\n[N] 按钮布局');
+
+const cssText = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
+ok(/\.item-menu-wrap\s*\{[^}]*display:\s*flex/.test(cssText),
+   '.item-menu-wrap 用 flex 让内部按钮撑满');
+ok(/\.item-menu-wrap\s*>\s*\.btn\s*\{[^}]*width:\s*100%/.test(cssText),
+   '.item-menu-wrap 内的按钮宽度 100%');
+ok(/\.item-menu-wrap\s*\{[^}]*min-width:\s*0/.test(cssText),
+   '.item-menu-wrap 允许收缩（min-width: 0）');
+
 console.log('\n' + pass + ' 通过 / ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

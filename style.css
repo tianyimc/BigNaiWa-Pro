@@ -900,7 +900,14 @@ body {
 /* 道具菜单：一个入口按钮 + 点击展开的悬浮面板 */
 .item-menu-wrap {
   position: relative;      /* 面板相对它定位 */
-  flex: 0 0 auto;
+  display: flex;           /* 让内部按钮撑满整个网格单元 */
+  min-width: 0;
+}
+
+/* 网格单元里的按钮要填满，否则「道具」右侧会留出一条空隙 */
+.item-menu-wrap > .btn {
+  flex: 1 1 auto;
+  width: 100%;
 }
 
 .item-menu {
@@ -1315,10 +1322,11 @@ body {
   #boardBtn .lbl,
   #soundBtn .lbl { display: none; }
 
-  #boardBtn, #soundBtn {
-    min-width: 46px;
-    padding: 0 10px;
-    font-size: 17px;
+  /* 所有操作按钮在窄屏统一尺寸，避免宽度参差导致间隙看着不匀 */
+  #boardBtn, #soundBtn, #resetBtn {
+    min-width: 0;
+    padding: 0;
+    font-size: 15px;
   }
 
   #boardBtn .ico, #soundBtn .ico { margin-right: 0; }
@@ -1409,7 +1417,7 @@ body {
 
   .btn { min-height: 44px; padding: 0 10px; font-size: 13px; }
 
-  #boardBtn, #soundBtn { min-width: 42px; font-size: 16px; }
+  #boardBtn, #soundBtn, #resetBtn { min-width: 0; font-size: 14px; }
 }
 
 /* 顶部信息条在横屏下是竖排的，恢复成图标 + 文字 */
