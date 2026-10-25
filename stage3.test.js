@@ -239,6 +239,16 @@ ok(helpText.indexOf('1.5 秒') >= 0, '教程写了越线判负 1.5 秒');
 ok(helpText.indexOf('Shift') >= 0, '教程写了 Shift 组合键');
 ok(helpText.indexOf('500 分') >= 0, '教程写了神奶蛙 500 分');
 ok(html.indexOf('<b>同级别</b>的奶蛙碰到一起') >= 0, '教程里写的是「同级别的奶蛙」而不是「水果」');
+
+/* 道具说明：四种道具都要在教程里出现 */
+ok(helpText.indexOf('道具') >= 0, '教程有道具相关说明');
+ok(helpText.indexOf('锤子') >= 0, '教程提到锤子');
+ok(helpText.indexOf('磁铁') >= 0, '教程提到磁铁');
+ok(helpText.indexOf('风扇') >= 0, '教程提到风扇');
+ok(helpText.indexOf('泡泡护盾') >= 0, '教程提到泡泡护盾');
+ok(helpText.indexOf('暂停危险计时') >= 0, '教程说明护盾会暂停危险计时');
+ok(helpText.indexOf('自动触发') >= 0, '教程说明护盾会自动触发');
+ok(helpText.indexOf('Esc') >= 0, '教程说明 Esc 可取消瞄准');
 ok(helpText.indexOf('同级别的</b>的水果') < 0, '教程里不再出现「同级别的水果」');
 
 /* 文案里的数字要和代码常量对得上，防止以后改代码忘了改文案 */
