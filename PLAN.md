@@ -40,46 +40,117 @@ This section is durable project guidance. It stays at the top of `PLAN.md` and m
 - For each future substantive implementation update/fix, the Execution Agent appends the corresponding version and concise summary to `VERSION_HISTORY.md` and updates the compact page-footer version if that task includes a substantive UI/code change. Documentation-only pushes do not change either version display or the history list.
 - The Planning Agent maintains these rules in this pinned section. The pinned section itself is never archived.
 
-## Active plan — Stage 4 follow-up: Hidden grant shortcut and run-score exclusion
+## Active plan — Stage 4 second phase: Item inventory, magnet, fan, and bubble shield
 
-Add a concealed, owner-approved shortcut to the existing game. This is a small follow-up within Stage 4, not a new Stage or game mode. Preserve normal play, the existing voucher cap, revive behavior, scoring, and the currently offline leaderboard.
+Extend the existing item system in the current game. This work remains within **Stage 4**; do not increment the Stage number. Add the magnet, small fan, and bubble shield, and replace the shared voucher balance with per-item inventory and random milestone rewards. Preserve the fruit-drop, physics, merge, survival, revive, and score loops.
 
-### Confirmed owner decisions
+### Current implementation facts to preserve
 
-- Clicking the existing game title repeatedly opens a concealed passphrase dialog; do not add a permanent button or disclose the entry in normal tutorial/help copy.
-- The fixed passphrase is `hhh`. This is a client-side convenience gate only: anyone who inspects the public JavaScript can discover it; it must not be described as secure authentication.
-- Each successful passphrase submission replenishes vouchers to **2/2** (never exceeds the existing cap) and adds **2 revive coins** to the current run.
-- A successful use makes the **entire current run** ineligible for historical-best updates and leaderboard submission, including any record the run had already written before the shortcut was used. Keep the run tainted through revivals; clear the flag only when a genuinely new run starts.
+- The Stage 4 voucher ledger uses 500-point milestones and per-band cascade qualification: at least 3 finalized double combos or 2 finalized triple combos. A milestone settles once after an open cascade closes. The current over-cap reward adds +100 visible score without advancing voucher progress, granting revive coins, or recursively settling milestones.
+- The current shared voucher balance is capped at 2. The hammer consumes one voucher and only removes a live, landed, currently contacting fruit at or below 55 px/s; targeting does not pause the simulation. The Stage 4 hidden grant fills this same shared balance and is a separate convenience shortcut.
+- Physics runs at a fixed 1/60 s update with 3 physics substeps; frame dt is capped at 0.25 s, and catch-up is limited to 5 steps. Gravity is 2,600 px/s². New item forces must be integrated into the existing simulation rather than directly changing fruit positions.
+- Danger time is tracked per landed fruit in `overTime`. A fruit above `DANGER_Y` accumulates danger time only when its speed is below 140 px/s; otherwise the timer decays at twice real simulation dt. It also decays below the line. Game over occurs when an individual `overTime` exceeds 1.5 s. This is not a single global countdown.
+- Game over first offers the existing revive flow when revive coins are available. A revive clears the current danger timers but continues the same run and preserves run inventory. A genuine `reset()` begins a new run.
+- The leaderboard is offline by default. Keep it offline and network-silent; do not remove its code or enable network behavior.
 
-### Implementation plan
+### A. Audit before implementation
 
-1. Inspect the current title markup/event wiring, run reset and game-over lifecycle, all historical-best writes, revive coin mutations, leaderboard submission entry points, and existing modal/input protections. Reuse current modal and state patterns; do not alter unrelated gameplay.
-2. Add a title-click counter with a short fixed time window (for example, seven deliberate clicks within two seconds); reset it when the window expires. Handle mouse, touch, and keyboard activation without double-counting a single gesture. The title remains visually unchanged and gains no obvious hint.
-3. On threshold, open an accessible passphrase dialog. Support submit, cancel, Enter/Escape, focus management, and mobile keyboards. Invalid input gives a neutral failure message and changes no game state. Closing or opening the dialog alone does not taint the run.
-4. On a correct passphrase, require an initialized run that has not reached terminal game over. Atomically set a run-level `runTainted`/equivalent flag, set vouchers to the existing maximum of 2, add exactly 2 revive coins, refresh both HUDs, and close the dialog. Do not add score, voucher progress, combo records, or other rewards. Repeated valid submissions during the same run may replenish vouchers to 2 and add another 2 revive coins each time; the run stays tainted. This shortcut must not bypass any other item cap or create persistent inventory.
-5. Prevent historical-best contamination for the whole run. Capture the historical best at run start (or equivalent reliable baseline); if this run already raised and persisted the best before the first successful shortcut use, restore the pre-run historical value without erasing a higher record unrelated to this run. After tainting, all score-update paths must continue updating the live run score and ordinary end-of-run summary but must not update `state.best`, the best-score DOM/localStorage record, or any future historical-best backend. Keep the prior historical best visible/accurate.
-6. Gate every leaderboard submission path on the run-taint flag, even though the leaderboard is currently offline. A tainted run must never be sent if online leaderboard support is enabled later. Keep the existing leaderboard placeholder and source files unchanged otherwise; do not make network requests.
-7. Make the end-of-run summary explain that this run used the shortcut and was excluded from records. Do not imply the user's personal score was erased: only historical best and leaderboard eligibility are excluded. On a new run, clear the taint and capture a new historical-best baseline; revival within the same run must not clear it.
-8. Keep the modal safe from gameplay input leakage: opening it must not drop a fruit through the overlay; while it is open, normal drop keys/pointer actions must not affect the board. Closing it restores the prior input behavior.
+1. Trace milestone queuing/finalization, the shared voucher state, hammer activation/removal, the hidden grant, `payoutOverflow()`, reset/revive, and all inventory/HUD updates.
+2. Trace `stepPhysics()`, force/integration order, fruit creation/removal, collision resolution, and the precise ordering of `checkGameOver()` relative to danger accumulation and terminal handling.
+3. Confirm how frame throttling and `performance.now()` behave when the tab is backgrounded. Use a monotonic clock for the shield's five-second real-time duration; reconcile expiry before the next danger check after a delayed frame.
+4. Report the minimal implementation points and any conflict in `PLAN_FEEDBACK.md` before changing code. Do not refactor unrelated physics or change the Stage number.
 
-### Tests and acceptance
+### B. Per-item inventory and random milestone rewards
 
-Add focused deterministic tests (extend an appropriate suite or create `stage4-followup.test.js`) for:
+#### Inventory model and reset
 
-- Title gesture threshold, timeout reset, single-gesture mouse/touch handling, dialog open/cancel, valid and invalid passphrase.
-- Successful use fills vouchers to 2 from balances 0/1/2, adds exactly 2 revive coins, permits a second valid use without exceeding 2 vouchers, and grants no score/progress/combo reward.
-- Failed/cancelled use leaves all state unchanged; use after terminal game over is rejected.
-- A run that had not beaten the historical best never updates it after tainting; a run that beat it before tainting restores the pre-run best; later scoring cannot rewrite it. Live score and the run summary remain correct.
-- Taint persists through revival and clears only on a new run.
-- Every leaderboard submit path rejects a tainted run; the offline placeholder remains network-silent.
-- Dialog interactions do not leak pointer, touch, Enter, Space, Escape, or arrow-key actions into fruit dropping; normal controls work after close.
-- Existing Stage 4 voucher, hammer, revive, game-over, and regression tests continue to pass.
+- Replace the generic voucher count with a per-run inventory keyed by `hammer`, `magnet`, `fan`, and `shield`. Centralize initial limits in one configuration table:
+  - hammer: maximum 2;
+  - magnet: maximum 2;
+  - fan: maximum 2;
+  - shield: maximum 1 held and at most one successful use per run.
+- A shield that has been consumed manually or automatically is permanently unavailable for the rest of that run. If held but not yet used, it occupies the one shield slot. If it is used, do not allow a later milestone to award another shield.
+- A new run clears all four counts, the shield-used flag, active effects, targeting modes, warnings, and temporary timers. Reviving preserves inventory and whether the shield was used; it must not reset item limits.
+- Migrate the existing hammer and hidden-grant logic to the new inventory without changing their established user-facing behavior. The hidden grant remains a Stage 4 convenience shortcut: it fills the hammer count to its existing maximum of 2 and adds 2 revive coins; it must not fill or alter the other item inventories. A successful use continues to taint the full run for records as currently implemented.
 
-Run the focused tests and existing project self-check suites; report commands and actual results in `PLAN_FEEDBACK.md`. Do not claim browser checks unless performed. For a substantive functional commit, follow the pinned Stage 4 single-hash version-history/footer rules. Do not push unless the owner explicitly asks.
+#### Milestone draw, caps, and compensation
 
-### Scope boundaries
+- Keep the existing score-progress source, 500-point bands, combo thresholds, cascade attribution, pending-node ordering, and exactly-once settlement unchanged.
+- At each qualified milestone, draw exactly one item uniformly from the four item types. Draw before checking inventory/availability, and never reroll or substitute another item.
+- If the drawn item's current held count is below its cap and it is available this run, add exactly one. For shield, availability requires both `shieldUsedThisRun === false` and no shield already held.
+- If the drawn item is at its hold cap, or if it is the one-use shield already consumed this run, award the existing +100 visible-score compensation instead. A shield already held but not used is at cap and therefore also yields compensation if drawn again.
+- Compensation does not grant any item, advance item-progress score, create a combo, trigger revive coins, or recursively evaluate milestones. Preserve the current overflow behavior for visible score and historical best, subject to the existing run-taint rule.
+- Inject or wrap the random source so tests can force each draw deterministically. Production draws are uniform; do not bias selection toward available items.
 
-- This follow-up adds only the concealed voucher/revive grant and whole-run record exclusion.
-- No new game mode, store, additional item, online service, public cheat button, or change to normal voucher/revive earning rules.
-- Do not claim the passphrase is confidential or tamper-proof in this public client-side repository.
-- If the existing best-score write lifecycle cannot safely roll back only this run's contribution, stop and report the concrete conflict and smallest safe approach before changing it.
+### C. Existing hammer migration
+
+- Keep the current hammer eligibility, hit testing, visuals, cancel behavior, and atomic removal contract. Change only its inventory read/write from shared vouchers to `inventory.hammer`.
+- A successful hammer use consumes one hammer; cancel, blank click, ineligible/stale target, or no inventory consumes none. Preserve all current reward isolation and cascade-removal protections.
+- Ensure the hidden grant fills only hammer inventory up to 2. Add coverage for grant behavior with 0, 1, and 2 hammers and for repeated valid grants.
+
+### D. Magnet
+
+- Add a magnet button and an exclusive targeting state (hammer and magnet targeting cannot be active simultaneously). On activation, show a clear instruction; the player selects one live fruit in `state.balls`. Cancel or invalid selection consumes nothing.
+- On valid selection, compute the local dense-area target as the center of nearby live fruits excluding the selected fruit, within a centralized configurable radius. If no other live fruit is within range, report that there is no suitable target and consume nothing.
+- Start a short, configurable, weak attraction effect on only the selected fruit. Recompute the local target as nearby fruit positions change. Apply bounded acceleration through the existing physics update; do not teleport, directly reposition, delete, merge, or create fruit.
+- Initial tuning parameters must be centralized (suggested starting points: 200 px neighborhood, 1.25 s duration, 250 px/s² maximum attraction acceleration) and calibrated in playtests against current gravity and collision behavior. Clamp the added acceleration/velocity contribution so a force cannot create runaway speed.
+- Once a valid effect starts, consume exactly one magnet. A target removed during the effect ends that effect cleanly; the consumed item is not refunded. Do not stack or restart a second magnet effect while one is active; reject that use without consumption.
+- Magnet use must not directly add score, combo records, revive coins, item progress, or danger-recovery rewards. Normal physics may still lead to ordinary collisions and merges.
+
+### E. Small fan
+
+- Add a fan button. Each successful use applies a short horizontal airflow to every live fruit currently participating in normal physics. Use a predictable alternating direction (first use left, next successful use right) to avoid another direction-selection dialog and keep the action bar compact.
+- Apply the force as bounded acceleration during existing physics substeps, not as a direct position/velocity teleport. Centralize and tune duration, acceleration, and maximum total velocity contribution; suggested starting points are 0.8 s, 600 px/s², and 180 px/s of added horizontal velocity.
+- Consume one fan only when the effect starts. Do not stack or restart another fan while one is active; reject without consumption. A fruit removed during the effect is ignored; newly created live fruit follows the documented effect scope (prefer all live fruit evaluated each substep until the effect expires).
+- End the force on duration expiry, new run, or terminal game over. Do not directly remove fruit, create merge results, add score/combo/revive/item rewards, or bypass collisions/danger checks.
+
+### F. Bubble shield and danger-clock integration
+
+#### One-run inventory and shared activation path
+
+- A held shield can be activated manually once, or activated automatically once. Both paths call one shared `activateShield(source)` routine that validates availability, marks `shieldUsedThisRun`, consumes the shield, sets a five-second expiry using a monotonic real-time clock, and updates the HUD.
+- Manual activation starts the effect immediately and consumes the shield only after validation succeeds. It gives no score, combo, revive coin, item-progress, or recovery reward.
+- Auto-use is allowed only when a shield is held, unused, not already active, and the game has not entered terminal game-over flow.
+- Evaluate auto-use immediately before danger/loss checks. For each live landed fruit above the danger line whose speed is below the existing 140 px/s danger-rest threshold, compute remaining time as `max(0, 1.5 s - overTime)`. When the minimum remaining time is at most 0.5 s, auto-activate once before any fruit can trigger `gameOver()` in that update. This must work when multiple fruits have different danger timers.
+
+#### Accurate pause and resume
+
+- Shield activation pauses the actual per-fruit `overTime` progression for all fruits, not just the warning or UI. Preserve each fruit's exact `overTime` and danger peak while active; neither accumulation nor decay may alter the paused countdown. Continue physics, collisions, merges, and the visible danger condition normally.
+- The five-second effect uses elapsed real time from a monotonic clock, not frame-count estimates. On each update and after background throttling, process expiration before danger checks. Do not grant a fresh 1.5-second danger timer on shield expiry: each fruit resumes with its own pre-shield `overTime` and remaining time.
+- If a fruit had 0.2 s remaining before activation, it still has 0.2 s remaining after the shield expires. The next eligible danger update may end the run if the fruit remains stationary and above the line.
+- A fruit that first enters the danger zone during the shield must not accumulate danger time until the shield expires. The shield does not erase pre-existing danger state or directly rescue/remove fruit.
+- Keep `state.danger`/danger-line visuals truthful while protected and show a separate clear shield-active indicator/countdown. When the shield expires, clear its timer and warning and resume the existing danger logic.
+- If danger loss or game-over/revive flow begins before a shield is validly activated, do not auto-trigger after terminal handling. Preserve the existing revive behavior. Shield use cannot be repeated after manual or automatic activation, and it cannot be reacquired for the rest of the run.
+
+### G. UI, feedback, and state consistency
+
+- Show separate counts and controls for hammer, magnet, fan, and shield. Each button consumes only its matching item; zero-count or currently unavailable actions are clearly disabled.
+- Show shield ownership, active protection, and remaining effect time distinctly. Show a brief, prominent warning for automatic activation (for example, “危险！泡泡护盾已自动触发”) and clear temporary messaging on expiry/reset.
+- Keep controls, counts, help/title, score, danger warning, and board usable at 320 px and 390 px widths. Reuse existing Pro styling and avoid a large HUD redesign.
+- Modal/targeting states must be mutually safe: no background fruit drops from pointer/touch/keyboard events; game-over cancels targeting; reset cancels every temporary effect. Do not pause physics for magnet, fan, or shield.
+
+### H. Implementation phases, tests, and versioning
+
+1. **Audit and inventory migration:** document current state and compatibility; migrate hammer/secret-grant; add deterministic random reward, caps, shield one-use ledger, compensation, and reset/revive coverage. Preserve milestone and cascade rules.
+2. **Magnet and fan:** implement force integration, exclusive targeting where needed, effect lifecycle/caps, HUD controls, and focused physics tests. Calibrate parameters without changing the base physics model.
+3. **Shield:** implement accurate per-fruit pause/resume and automatic trigger ordering, then HUD and boundary tests for multiple danger timers, frame delays, and game-over/revive transitions.
+4. **Regression and documentation:** run Stage 4 and existing suites, desktop/narrow viewport checks, and console/network checks. Record actual changes, deviations, and results in `PLAN_FEEDBACK.md`; update `VERSION_HISTORY.md` and the footer for substantive commits using **Stage 4** and its single-hash rule. Do not update version labels for plan/feedback-only commits.
+5. Validate each phase before moving to the next. If source behavior conflicts with this plan, record the concrete conflict and smallest safe adjustment in `PLAN_FEEDBACK.md` before implementing the affected requirement.
+
+Deterministic test coverage must include:
+
+- Each of the four forced random outcomes; uniform production selection contract; no reroll; unavailable/capped item produces exactly one +100 and no recursive milestone or secondary rewards.
+- Per-item caps at below/at/above boundaries, one-use shield held/used/reward-blocked states, new-run reset, revive preservation, random item state, and secret-grant interaction with hammer only.
+- Hammer regressions: valid/invalid/resting/moving/stale targets, cancellation, exactly-once inventory consumption, reward isolation, and cascade removal.
+- Magnet targeting, no-neighbor failure/no charge, local-target recomputation, force/duration caps, target removal, no stacking, collision/merge preservation, and no direct rewards or teleportation.
+- Fan left/right alternation, affected live objects, new fruit during active airflow, force/duration/speed caps, no stacking, cleanup, collision/merge/danger preservation, and no direct rewards.
+- Shield manual/automatic activation, one-use enforcement, exact 0.5 s trigger boundary, auto-trigger before game-over, multiple fruits with different `overTime`, stationary/moving/below-line cases, exact five-second elapsed time, preserved sub-0.5-second remainder, fruit entering danger during shield, long-frame/background expiry, revive preservation, reset cleanup, and no-shield regression.
+- HUD/state agreement, 320 px / 390 px layouts, modal and targeting input isolation, no console errors, and zero network requests with the leaderboard offline.
+- Existing `physics.test.js`, `gameplay.test.js`, `name-filter.test.js`, `stage2.test.js`, `stage3.test.js`, `stage4.test.js`, and `stage4-followup.test.js` remain passing.
+
+### Stage 4 scope boundaries
+
+- This is Stage 4; do not create Stage 5 or change the version's Stage number.
+- Add only per-type inventory/random milestone awards and the magnet, fan, and bubble shield described here. Do not add shops, random world drops, online services, or other item types.
+- Preserve current score/milestone/combo rules, hammer semantics, revive behavior, run-taint handling, leaderboard-offline default, and core gameplay.
+- Tune only centralized item parameters; do not conduct unrelated physics or HUD redesigns.

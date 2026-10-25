@@ -356,3 +356,54 @@ For each substantive Stage 4 functional commit, append a concise entry to `VERSI
 - Include only voucher earning, per-500-point combo tracking, capped overflow points, and the hammer.
 - Do not add magnets, fans, a shop, random item drops, additional item types, online services, or a new mode.
 - Prefer the smallest changes compatible with current code. If the audited cascade/score lifecycle cannot satisfy the stated ordering without materially changing existing behavior, stop and report the concrete conflict and smallest proposed adjustment before implementing that conflicting change.
+
+
+---
+
+## Archived 2026-10-25 — Stage 4 follow-up: Hidden grant shortcut and run-score exclusion
+
+**Status: COMPLETED.** Implemented and verified according to the Stage 4 follow-up execution report in PLAN_FEEDBACK.md (version v. Stage 4-997b334, footer v4-997b).
+
+## Active plan — Stage 4 follow-up: Hidden grant shortcut and run-score exclusion
+
+Add a concealed, owner-approved shortcut to the existing game. This is a small follow-up within Stage 4, not a new Stage or game mode. Preserve normal play, the existing voucher cap, revive behavior, scoring, and the currently offline leaderboard.
+
+### Confirmed owner decisions
+
+- Clicking the existing game title repeatedly opens a concealed passphrase dialog; do not add a permanent button or disclose the entry in normal tutorial/help copy.
+- The fixed passphrase is `hhh`. This is a client-side convenience gate only: anyone who inspects the public JavaScript can discover it; it must not be described as secure authentication.
+- Each successful passphrase submission replenishes vouchers to **2/2** (never exceeds the existing cap) and adds **2 revive coins** to the current run.
+- A successful use makes the **entire current run** ineligible for historical-best updates and leaderboard submission, including any record the run had already written before the shortcut was used. Keep the run tainted through revivals; clear the flag only when a genuinely new run starts.
+
+### Implementation plan
+
+1. Inspect the current title markup/event wiring, run reset and game-over lifecycle, all historical-best writes, revive coin mutations, leaderboard submission entry points, and existing modal/input protections. Reuse current modal and state patterns; do not alter unrelated gameplay.
+2. Add a title-click counter with a short fixed time window (for example, seven deliberate clicks within two seconds); reset it when the window expires. Handle mouse, touch, and keyboard activation without double-counting a single gesture. The title remains visually unchanged and gains no obvious hint.
+3. On threshold, open an accessible passphrase dialog. Support submit, cancel, Enter/Escape, focus management, and mobile keyboards. Invalid input gives a neutral failure message and changes no game state. Closing or opening the dialog alone does not taint the run.
+4. On a correct passphrase, require an initialized run that has not reached terminal game over. Atomically set a run-level `runTainted`/equivalent flag, set vouchers to the existing maximum of 2, add exactly 2 revive coins, refresh both HUDs, and close the dialog. Do not add score, voucher progress, combo records, or other rewards. Repeated valid submissions during the same run may replenish vouchers to 2 and add another 2 revive coins each time; the run stays tainted. This shortcut must not bypass any other item cap or create persistent inventory.
+5. Prevent historical-best contamination for the whole run. Capture the historical best at run start (or equivalent reliable baseline); if this run already raised and persisted the best before the first successful shortcut use, restore the pre-run historical value without erasing a higher record unrelated to this run. After tainting, all score-update paths must continue updating the live run score and ordinary end-of-run summary but must not update `state.best`, the best-score DOM/localStorage record, or any future historical-best backend. Keep the prior historical best visible/accurate.
+6. Gate every leaderboard submission path on the run-taint flag, even though the leaderboard is currently offline. A tainted run must never be sent if online leaderboard support is enabled later. Keep the existing leaderboard placeholder and source files unchanged otherwise; do not make network requests.
+7. Make the end-of-run summary explain that this run used the shortcut and was excluded from records. Do not imply the user's personal score was erased: only historical best and leaderboard eligibility are excluded. On a new run, clear the taint and capture a new historical-best baseline; revival within the same run must not clear it.
+8. Keep the modal safe from gameplay input leakage: opening it must not drop a fruit through the overlay; while it is open, normal drop keys/pointer actions must not affect the board. Closing it restores the prior input behavior.
+
+### Tests and acceptance
+
+Add focused deterministic tests (extend an appropriate suite or create `stage4-followup.test.js`) for:
+
+- Title gesture threshold, timeout reset, single-gesture mouse/touch handling, dialog open/cancel, valid and invalid passphrase.
+- Successful use fills vouchers to 2 from balances 0/1/2, adds exactly 2 revive coins, permits a second valid use without exceeding 2 vouchers, and grants no score/progress/combo reward.
+- Failed/cancelled use leaves all state unchanged; use after terminal game over is rejected.
+- A run that had not beaten the historical best never updates it after tainting; a run that beat it before tainting restores the pre-run best; later scoring cannot rewrite it. Live score and the run summary remain correct.
+- Taint persists through revival and clears only on a new run.
+- Every leaderboard submit path rejects a tainted run; the offline placeholder remains network-silent.
+- Dialog interactions do not leak pointer, touch, Enter, Space, Escape, or arrow-key actions into fruit dropping; normal controls work after close.
+- Existing Stage 4 voucher, hammer, revive, game-over, and regression tests continue to pass.
+
+Run the focused tests and existing project self-check suites; report commands and actual results in `PLAN_FEEDBACK.md`. Do not claim browser checks unless performed. For a substantive functional commit, follow the pinned Stage 4 single-hash version-history/footer rules. Do not push unless the owner explicitly asks.
+
+### Scope boundaries
+
+- This follow-up adds only the concealed voucher/revive grant and whole-run record exclusion.
+- No new game mode, store, additional item, online service, public cheat button, or change to normal voucher/revive earning rules.
+- Do not claim the passphrase is confidential or tamper-proof in this public client-side repository.
+- If the existing best-score write lifecycle cannot safely roll back only this run's contribution, stop and report the concrete conflict and smallest safe approach before changing it.
