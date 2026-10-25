@@ -66,6 +66,7 @@
           <h2 id="overTitle">游戏结束</h2>
           <p class="dialog-score">本局得分 <strong id="finalScore">0</strong></p>
           <p class="dialog-best">最高分 <span id="finalBest">0</span></p>
+          <p class="taint-note" id="taintNote" hidden>本局使用过隐藏口令，不计入历史最高分与排行榜</p>
 
           <!-- 本局亮点：五项统计，两列紧凑排版 -->
           <div class="run-stats" id="runStats">
@@ -115,7 +116,7 @@
 
     <header class="panel-head">
       <div class="title-row">
-        <h1>合成大奶蛙Pro</h1>
+        <h1 id="gameTitle">合成大奶蛙Pro</h1>
         <button class="help-btn" id="helpBtn" type="button"
                 aria-label="玩法教程" title="玩法教程" aria-haspopup="dialog">?</button>
       </div>
@@ -186,6 +187,29 @@
         aria-label="打开开源仓库：Tianyimc / BigNaiWa-Pro（新标签页）">开放源代码</a>）
   </p>
 </footer>
+
+<!-- ===== 隐藏口令弹窗（连点标题 7 次才会出现） ===== -->
+<div class="modal" id="secretModal" aria-hidden="true" role="dialog"
+     aria-modal="true" aria-labelledby="secretTitle">
+  <div class="modal-card secret-card">
+    <header class="modal-head">
+      <h2 id="secretTitle">🔑 输入口令</h2>
+      <button class="icon-btn" id="secretClose" type="button" aria-label="关闭">✕</button>
+    </header>
+    <form class="secret-body" id="secretForm" autocomplete="off">
+      <label class="secret-label" for="secretInput">口令</label>
+      <input class="secret-input" id="secretInput" type="password"
+             inputmode="text" autocomplete="off" autocapitalize="off"
+             spellcheck="false" enterkeyhint="go" maxlength="24">
+      <p class="secret-msg" id="secretMsg" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button class="btn" id="secretCancel" type="button">取消</button>
+        <button class="btn btn-primary" id="secretOk" type="submit">确定</button>
+      </div>
+      <p class="dialog-hint">本局使用后将不计入历史最高分与排行榜</p>
+    </form>
+  </div>
+</div>
 
 <!-- ===== 玩法教程弹窗 ===== -->
 <div class="modal" id="helpModal" aria-hidden="true" role="dialog"

@@ -155,7 +155,7 @@ console.log('\n[B] 改名为「合成大奶蛙Pro」');
 ok(/<title>合成大奶蛙Pro<\/title>/.test(html), '浏览器标题已改成 Pro');
 ok(html.indexOf('apple-mobile-web-app-title" content="合成大奶蛙Pro"') >= 0, 'iOS 主屏标题已改成 Pro');
 ok(html.indexOf('aria-label="合成大奶蛙Pro 游戏区域"') >= 0, '画布无障碍标签已改成 Pro');
-ok(/<h1>合成大奶蛙Pro<\/h1>/.test(html), '页面大标题已改成 Pro');
+ok(/<h1[^>]*>合成大奶蛙Pro<\/h1>/.test(html), '页面大标题已改成 Pro');
 ok(html.indexOf('<h1>合成大奶蛙</h1>') < 0, '旧标题（不带 Pro）已不存在');
 
 /* ============================================================

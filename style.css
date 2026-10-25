@@ -970,6 +970,63 @@ body {
   .voucher-chip.pop { animation: none; }
 }
 
+/* ---------------- 隐藏口令弹窗（Stage 4 追加） ---------------- */
+
+.secret-card { max-width: min(340px, 92vw); }
+
+.secret-body { text-align: left; }
+
+.secret-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.secret-input {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 16px;          /* ≥16px，iOS 才不会自动放大 */
+  color: var(--ink);
+  text-align: center;
+  letter-spacing: .12em;
+  border: 1px solid rgba(214, 160, 96, .45);
+  border-radius: 12px;
+  background: #fff;
+  outline: none;
+}
+
+.secret-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, .18);
+}
+
+.secret-msg {
+  margin: 8px 0 12px;
+  min-height: 1.2em;
+  font-size: 12px;
+  text-align: center;
+  color: #c0483a;
+}
+
+/* 结算面板上的「本局不计入记录」提示 */
+.taint-note {
+  margin: 0 0 12px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  text-align: center;
+  color: #8a4a12;
+  background: rgba(255, 226, 178, .85);
+  box-shadow: inset 0 0 0 1px rgba(214, 160, 96, .3);
+}
+
+/* 标题是隐藏入口：保持视觉不变，但给一点点可点击的暗示 */
+#gameTitle { cursor: default; user-select: none; -webkit-user-select: none; }
+
 /* ---------------- 参数提示 ---------------- */
 
 .tips {
@@ -1042,11 +1099,14 @@ body {
     line-height: 1.5;
   }
 
-  /* ---- 顶部信息条 ---- */
+  /* ---- 顶部信息条 ----
+     一行要放下「分数 / 最高分」两个三位数 + 四个操作按钮。
+     分数卡片保持紧凑，按钮压成窄图标按钮，两边都留出足够宽度。 */
   .panel {
     flex-direction: row;
+    flex-wrap: nowrap;
     align-items: stretch;
-    gap: 8px;
+    gap: 5px;
     width: 100%;
     max-width: calc(96vw * 700 / 420);
     padding: 8px 10px;
@@ -1082,16 +1142,17 @@ body {
   .tips { display: none; }
 
   .stats {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     display: flex;
-    gap: 8px;
+    gap: 5px;
     min-width: 0;
   }
 
   .stat {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 6px 6px;
+    flex: 1 1 auto;
+    min-width: 52px;
+    padding: 6px 7px;
+    overflow: hidden;
     border-radius: 12px;
     background: rgba(255, 255, 255, .9);
     box-shadow: 0 2px 8px rgba(140, 96, 56, .12);
@@ -1124,14 +1185,28 @@ body {
 
   .stat-value {
     margin-top: 0;
+    /* 三位数分数要能塞进窄卡片：用 clamp 让字号随可用宽度收缩 */
     font-size: 20px;
     line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .actions {
     flex: 0 0 auto;
     display: flex;
-    gap: 6px;
+    gap: 4px;
+  }
+
+  /* 四个按钮压成 34px 的方形图标按钮 */
+  .actions .btn {
+    flex: 0 0 auto;
+    width: 34px;
+    min-width: 34px;
+    padding: 0;
+    font-size: 15px;
   }
 
   /* 触摸目标够大，别让人点不中 */
@@ -1217,15 +1292,27 @@ body {
 
 /* 小屏手机（iPhone SE 等 375 以下）：再压一档，保证一行放得下 */
 @media (max-width: 380px) {
-  .panel { padding: 6px 8px; gap: 6px; }
+  .panel { padding: 6px 8px; gap: 5px; }
 
-  .stats { gap: 6px; }
+  .stats { gap: 5px; }
 
-  .stat { padding: 5px 8px; }
+  .stat { padding: 5px 6px; min-width: 48px; }
 
   .stat-value { font-size: 17px; }
 
   .stat-label { font-size: 9px; letter-spacing: 0; white-space: nowrap; }
+
+  /* 四个操作按钮在 320px 下必须再小一档，
+     否则「最高分」的三位数会被挤掉 */
+  .actions { gap: 3px; }
+
+  .actions .btn {
+    width: 30px;
+    min-width: 30px;
+    min-height: 38px;
+    padding: 0;
+    font-size: 14px;
+  }
 
   .btn { min-height: 44px; padding: 0 10px; font-size: 13px; }
 

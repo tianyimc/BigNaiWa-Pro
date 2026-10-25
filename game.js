@@ -71,6 +71,15 @@
   const HAMMER_REST_SPEED = 55;    // 锤子只能砸「基本停住」的水果（px/s）
   const HAMMER_REST_SPEED2 = HAMMER_REST_SPEED * HAMMER_REST_SPEED;
 
+  /* —— Stage 4 追加：隐藏口令（owner 指定的后门）——
+     注意：这是公开仓库的前端代码，口令必然可被看到，**不是**安全认证，
+     只当作一个隐蔽的便捷入口。 */
+  const SECRET_PASS = 'hhh';
+  const SECRET_CLICKS = 7;          // 需要连点几次标题
+  const SECRET_WINDOW = 2000;       // 连点窗口（毫秒）
+  const SECRET_VOUCHERS = VOUCHER_MAX;  // 补满到券上限（2）
+  const SECRET_REVIVES = 2;         // 额外送几枚复活币
+
   /* —— Q 弹手感 —— */
   const RESTITUTION      = 0.38;  // 球与球之间的弹性
   const WALL_RESTITUTION = 0.45;  // 撞墙 / 撞地面的弹性
@@ -305,6 +314,16 @@
        hammerHover 当前鼠标/手指悬停命中的可砸水果（用于高亮） */
     hammerMode: false,
     hammerHover: null,
+
+    /* —— 隐藏口令与「本局成绩作废」——
+       runTainted    本局是否用过隐藏口令（用过则整局不计入历史最高分与排行榜）
+       bestBaseline  本局开始时的历史最高分，用于回滚本局推高的部分
+       secretClicks  连点标题的计数
+       secretLastAt  上一次点击标题的时刻（performance.now） */
+    runTainted: false,
+    bestBaseline: 0,
+    secretClicks: 0,
+    secretLastAt: 0,
 
     /* —— 局内统计（每局重置，只由玩法事件驱动）—— */
     stats: {
@@ -843,14 +862,176 @@
     }
   }
 
+  /* ---------------------------------------------------------
+   *  隐藏口令：连点标题 → 输入口令 → 补满券 + 送 2 枚复活币
+   *  一旦成功使用，**整局**都不计入历史最高分与排行榜。
+   * ------------------------------------------------------- */
+
+  /* 本局是否已作废（不计入历史记录） */
+  function isRunTainted() { return state.runTainted === true; }
+
+  /* 标记本局作废，并把被本局推高的历史最高分回滚到开局时的基线。
+     只回滚「本局推高的部分」：如果基线本来就更高，state.best 保持基线不变。 */
+  function taintRun() {
+    if (state.runTainted) return;
+    state.runTainted = true;
+    /* 回滚：只有当当前 best 高于基线（说明是本局推上去的）时才恢复 */
+    if (state.best > state.bestBaseline) {
+      state.best = state.bestBaseline;
+      try { localStorage.setItem(BEST_KEY, String(state.best)); } catch (e) { /* 忽略 */ }
+      if (bestEl) bestEl.textContent = state.best;
+    }
+    paintRunTainted();
+  }
+
+  /* 结算面板上的「本局不计入记录」提示 */
+  function paintRunTainted() {
+    const note = document.getElementById('taintNote');
+    if (!note) return;
+    note.hidden = !state.runTainted;
+  }
+
+  /* 校验口令并发放。返回 true 表示成功。
+     条件：口令正确、本局已开局、尚未终局判负。 */
+  function applySecretGrant(pass) {
+    if (String(pass || '').trim() !== SECRET_PASS) return false;
+    if (state.over) return false;                 // 已终局，拒绝
+
+    /* 原子操作：先作废本局，再补资源 */
+    taintRun();
+
+    state.vouchers = SECRET_VOUCHERS;             // 补满到上限，不会超过
+    state.revives += SECRET_REVIVES;              // 送 2 枚复活币
+    paintVouchers(true);
+    paintRevives(true);
+
+    /* 用中等字号（chain 档）而不是 40px 大字：两条 40px 叠在棋盘中央
+       会盖住大半个屏幕，尤其判负时还会压住结算面板。 */
+    state.floats.push({ x: W / 2, y: 200, text: '已补满道具券', life: 1.1, chain: true });
+    state.floats.push({ x: W / 2, y: 248, text: '+2 复活币', life: 1.1, chain: true });
+    Sound.bonus();
+    return true;
+  }
+
+  /* 连点标题：窗口内累计到阈值就开弹窗 */
+  function registerTitleClick() {
+    const now = performance.now();
+    if (now - state.secretLastAt > SECRET_WINDOW) state.secretClicks = 0;
+    state.secretLastAt = now;
+    state.secretClicks++;
+    if (state.secretClicks >= SECRET_CLICKS) {
+      state.secretClicks = 0;
+      openSecretDialog();
+    }
+  }
+
+  /* ---------------------------------------------------------
+   *  隐藏口令弹窗：打开 / 提交 / 取消 / 焦点管理
+   * ------------------------------------------------------- */
+
+  let secretLastFocus = null;
+
+  function secretEls() {
+    return {
+      modal: document.getElementById('secretModal'),
+      input: document.getElementById('secretInput'),
+      form: document.getElementById('secretForm'),
+      msg: document.getElementById('secretMsg'),
+      close: document.getElementById('secretClose'),
+      cancel: document.getElementById('secretCancel')
+    };
+  }
+
+  function openSecretDialog() {
+    const e = secretEls();
+    if (!e.modal || e.modal.classList.contains('show')) return;
+    secretLastFocus = document.activeElement || null;
+    if (e.msg) e.msg.textContent = '';
+    if (e.input) e.input.value = '';
+    e.modal.classList.add('show');
+    e.modal.setAttribute('aria-hidden', 'false');
+    /* 移动端要主动聚焦，键盘才会弹出来 */
+    if (e.input) {
+      try { e.input.focus(); } catch (err) { /* 忽略 */ }
+    }
+  }
+
+  function closeSecretDialog() {
+    const e = secretEls();
+    if (!e.modal || !e.modal.classList.contains('show')) return;
+    e.modal.classList.remove('show');
+    e.modal.setAttribute('aria-hidden', 'true');
+    if (e.input) e.input.value = '';
+    if (e.msg) e.msg.textContent = '';
+    if (secretLastFocus && secretLastFocus.focus) {
+      try { secretLastFocus.focus(); } catch (err) { /* 忽略 */ }
+    }
+    secretLastFocus = null;
+  }
+
+  function secretDialogOpen() {
+    const e = secretEls();
+    return !!(e.modal && e.modal.classList.contains('show'));
+  }
+
+  /* 提交口令。成功才关窗；失败只给一句中性提示，不改任何游戏状态。 */
+  function submitSecret() {
+    const e = secretEls();
+    const val = e.input ? e.input.value : '';
+    if (applySecretGrant(val)) {
+      closeSecretDialog();
+      return true;
+    }
+    if (e.msg) e.msg.textContent = '口令不对，再试试';
+    if (e.input) {
+      try { e.input.select(); } catch (err) { /* 忽略 */ }
+    }
+    return false;
+  }
+
+  function bindSecretDialog() {
+    const e = secretEls();
+    if (!e.modal) return;
+
+    /* 标题连点：鼠标、触屏、键盘（Enter/Space）都算一次，且不会重复计数 */
+    const title = document.getElementById('gameTitle');
+    if (title) {
+      title.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        registerTitleClick();
+      });
+      /* 键盘激活标题（若有 tabindex）时也计入，但避免和 click 重复 */
+      title.addEventListener('keydown', (ev) => {
+        if (ev.code === 'Enter' || ev.code === 'Space') {
+          ev.preventDefault();
+          registerTitleClick();
+        }
+      });
+    }
+
+    if (e.form) {
+      e.form.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        submitSecret();
+      });
+    }
+    if (e.close) e.close.addEventListener('click', closeSecretDialog);
+    if (e.cancel) e.cancel.addEventListener('click', closeSecretDialog);
+
+    /* 点遮罩空白处关闭 */
+    e.modal.addEventListener('click', (ev) => {
+      if (ev.target === e.modal) closeSecretDialog();
+    });
+
+    /* 点弹窗内部不要穿透到棋盘 */
+    e.modal.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+    e.modal.addEventListener('pointerup', (ev) => ev.stopPropagation());
+  }
+
   /* 满额奖励：只改可见分数与最高分，不动 voucherProgress，也不递归结算 */
   function payoutOverflow(m) {
     state.score += VOUCHER_OVERFLOW_SCORE;
-    if (state.score > state.best) {
-      state.best = state.score;
-      localStorage.setItem(BEST_KEY, String(state.best));
-      bestEl.textContent = state.best;
-    }
+    updateBestIfEligible();
     scoreEl.textContent = state.score;
     bump(scoreEl);
     state.floats.push({
@@ -862,11 +1043,7 @@
 
   function addScore(n, x, y, text) {
     state.score += n;
-    if (state.score > state.best) {
-      state.best = state.score;
-      localStorage.setItem(BEST_KEY, String(state.best));
-      bestEl.textContent = state.best;
-    }
+    updateBestIfEligible();
     scoreEl.textContent = state.score;
     bump(scoreEl);
     if (x !== undefined) {
@@ -876,15 +1053,22 @@
     advanceVoucherProgress(n);   // 实质得分 → 推进券进度
   }
 
+  /* 历史最高分的唯一写入口。
+     本局一旦用过隐藏口令（runTainted），就不再写 state.best / localStorage / DOM，
+     只让实时分数与结算面板继续正常变化。 */
+  function updateBestIfEligible() {
+    if (state.runTainted) return;             // 本局成绩作废，不碰历史最高分
+    if (state.score <= state.best) return;
+    state.best = state.score;
+    try { localStorage.setItem(BEST_KEY, String(state.best)); } catch (e) { /* 忽略 */ }
+    if (bestEl) bestEl.textContent = state.best;
+  }
+
   /* 只加分数，不走「每 1500 分发复活币」那条路。
      连锁奖励和危险线救回都用它 —— 这两笔钱不该加速攒币。 */
   function addBonusScore(n, x, y, text) {
     state.score += n;
-    if (state.score > state.best) {
-      state.best = state.score;
-      localStorage.setItem(BEST_KEY, String(state.best));
-      bestEl.textContent = state.best;
-    }
+    updateBestIfEligible();
     scoreEl.textContent = state.score;
     bump(scoreEl);
     if (x !== undefined) {
@@ -1310,9 +1494,12 @@
     if (revivePromptEl) revivePromptEl.hidden = true;
     if (overPanelEl) overPanelEl.hidden = false;
     paintStats();                    // 先把这一局的统计刷上去
+    paintRunTainted();               // 本局若用过隐藏口令，这里说明不计入记录
     if (overlayEl) overlayEl.classList.add('show');
-    /* 交给排行榜模块（没加载也不影响） */
-    if (window.DanaiwaBoard && window.DanaiwaBoard.onGameOver) {
+    /* 交给排行榜模块（没加载也不影响）。
+       本局一旦用过隐藏口令，就整局不上榜 —— 即使以后重新开启在线排行榜，
+       这条门控依然有效。 */
+    if (!state.runTainted && window.DanaiwaBoard && window.DanaiwaBoard.onGameOver) {
       window.DanaiwaBoard.onGameOver(state.score);
     }
   }
@@ -1475,6 +1662,14 @@
     /* 锤子退出瞄准态 */
     state.hammerMode = false;
     state.hammerHover = null;
+
+    /* 新的一局：清除「成绩作废」标记，并记录历史最高分基线，
+       用于本局若使用隐藏口令时把被推高的部分回滚掉。 */
+    state.runTainted = false;
+    state.bestBaseline = state.best;
+    state.secretClicks = 0;
+    state.secretLastAt = 0;
+    paintRunTainted();
 
     /* 局内统计清零 */
     state.stats.maxCascade = 0;
@@ -2099,7 +2294,7 @@
      教程弹窗里按空格/回车/方向键绝不能投放水果（PLAN Stage 3 的硬要求）；
      排行榜、赞助这类弹窗同理 —— 开着弹窗还在背后掉水果是明显的 bug。 */
   function isModalOpen() {
-    const ids = ['helpModal', 'boardModal', 'sponsorModal'];
+    const ids = ['helpModal', 'boardModal', 'sponsorModal', 'secretModal'];
     for (let i = 0; i < ids.length; i++) {
       const m = document.getElementById(ids[i]);
       if (m && m.classList && m.classList.contains('show')) return true;
@@ -2108,6 +2303,17 @@
   }
 
   window.addEventListener('keydown', (e) => {
+    /* 口令弹窗优先：Esc 关闭；Enter 交给表单；其余按键留在输入框里，
+       绝不透到棋盘（这一步必须在 isTyping 之前，否则输入框里按空格会漏下去）。 */
+    if (secretDialogOpen()) {
+      if (e.code === 'Escape' || e.key === 'Escape') {
+        closeSecretDialog();
+        e.preventDefault();
+        return;
+      }
+      return;      // 其它按键全部交给弹窗自己处理
+    }
+
     if (isTyping(e)) return;
     if (isModalOpen()) return;
 
@@ -2262,6 +2468,8 @@
     }
     paintVouchers(false);
     paintHammerHint();
+    bindSecretDialog();
+    paintRunTainted();
 
     drawChain();
     reset();
@@ -2290,6 +2498,12 @@
                      advanceVoucherProgress, trySettleMilestones, settleMilestone,
                      VOUCHER_STEP, VOUCHER_MAX, VOUCHER_OVERFLOW_SCORE,
                      COMBO_DOUBLE_NEED, COMBO_TRIPLE_NEED, HAMMER_REST_SPEED,
+                     /* Stage 4 追加：隐藏口令 */
+                     isRunTainted, taintRun, applySecretGrant, registerTitleClick,
+                     openSecretDialog, closeSecretDialog, secretDialogOpen,
+                     submitSecret, paintRunTainted, updateBestIfEligible,
+                     SECRET_PASS, SECRET_CLICKS, SECRET_WINDOW,
+                     SECRET_VOUCHERS, SECRET_REVIVES,
                      unlockTier, isDiscovered, loadDiscovery, saveDiscovery, reloadDiscovery,
                      paintStats,
                      paintReviveChoices, clearForRevive, topFirstOrder, drawChain, drawSilhouette,
