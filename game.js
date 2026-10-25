@@ -77,8 +77,30 @@
   const SECRET_PASS = 'hhh';
   const SECRET_CLICKS = 7;          // 需要连点几次标题
   const SECRET_WINDOW = 2000;       // 连点窗口（毫秒）
-  const SECRET_VOUCHERS = VOUCHER_MAX;  // 补满到券上限（2）
+  const SECRET_HAMMERS = 2;         // 隐藏发放：只把锤子补到 2，不动其它道具
   const SECRET_REVIVES = 2;         // 额外送几枚复活币
+
+  /* —— Stage 4 第二阶段：四种道具的独立库存 ——
+     每种道具单独计数，里程碑随机抽一种。上限集中在这张表里。
+     shield 特殊：每局最多持有 1 个，且用掉后本局不再补。 */
+  const ITEM_TYPES = ['hammer', 'magnet', 'fan', 'shield'];
+  const ITEM_MAX = { hammer: 2, magnet: 2, fan: 2, shield: 1 };
+  const ITEM_LABEL = { hammer: '锤子', magnet: '磁铁', fan: '风扇', shield: '泡泡护盾' };
+
+  /* —— 磁铁参数（PLAN 建议的起始值，可在实测后调整）—— */
+  const MAGNET_RADIUS = 200;        // 找「局部密集区」的搜索半径（px）
+  const MAGNET_DURATION = 1.25;     // 吸附持续秒数
+  const MAGNET_ACCEL = 250;         // 最大吸引加速度（px/s²）
+  const MAGNET_MAX_SPEED = 420;     // 吸附造成的速度上限（防失控）
+
+  /* —— 小风扇参数 —— */
+  const FAN_DURATION = 0.8;         // 气流持续秒数
+  const FAN_ACCEL = 600;            // 水平加速度（px/s²）
+  const FAN_MAX_ADDED_VX = 180;     // 水平速度贡献上限（px/s）
+
+  /* —— 泡泡护盾参数 —— */
+  const SHIELD_DURATION = 5;        // 护盾持续「真实秒数」
+  const SHIELD_AUTO_WINDOW = 0.5;   // 剩余危险时间 ≤ 这个值就自动触发（秒）
 
   /* —— Q 弹手感 —— */
   const RESTITUTION      = 0.38;  // 球与球之间的弹性
@@ -296,8 +318,24 @@
     cascadeY: 0,
     cascadeStartBand: 0,   // 这条连锁开链时所在的券档位
 
+    /* —— 道具库存（每局重置；复活不重置）——
+       每种道具独立计数，上限见 ITEM_MAX。
+       shieldUsedThisRun 泡泡护盾本局是否已用掉（用掉后本局不再补） */
+    inventory: { hammer: 0, magnet: 0, fan: 0, shield: 0 },
+    shieldUsedThisRun: false,
+
+    /* —— 道具效果（每局重置）——
+       magnet   { active, target, until, ... } 磁铁吸附
+       fan      { active, dir, until }          风扇气流（dir: -1 左 / +1 右）
+       fanNextDir 下一次风扇的方向（左右交替）
+       shield   { active, until }               护盾（until 用单调时钟的真实时间） */
+    magnet: null,
+    fan: null,
+    fanNextDir: -1,
+    shield: null,
+
     /* —— 道具券（每局重置；复活不重置）——
-       vouchers        当前持有几张券（上限 VOUCHER_MAX）
+       vouchers        旧的共享券计数（已由 inventory 取代，仅保留兼容）
        voucherProgress 券进度分：单调递增，只有「实质得分」才推进它。
                        满额时的 +100 不加进来，避免靠溢出奖励刷券。
        voucherMilestone 已经结算到第几个 500 分节点（0 表示还没结算过）
@@ -314,6 +352,7 @@
        hammerHover 当前鼠标/手指悬停命中的可砸水果（用于高亮） */
     hammerMode: false,
     hammerHover: null,
+    magnetMode: false,
 
     /* —— 隐藏口令与「本局成绩作废」——
        runTainted    本局是否用过隐藏口令（用过则整局不计入历史最高分与排行榜）
@@ -404,6 +443,10 @@
     const balls = state.balls;
     const merges = [];
     const contacts = [];      // 本子步的接触列表，用于弹性冲量
+
+    /* --- 道具力（在积分之前施加，作为加速度融入现有物理）--- */
+    applyMagnetForce(dt);
+    applyFanForce(dt);
 
     /* --- 积分 --- */
     for (let i = 0; i < balls.length; i++) {
@@ -731,33 +774,146 @@
   }
 
   /* 道具券计数与锤子按钮状态 */
-  function paintVouchers(pop) {
-    const chip = document.getElementById('voucherChip');
-    const cnt = document.getElementById('voucherCount');
-    const btn = document.getElementById('hammerBtn');
-    if (cnt) cnt.textContent = state.vouchers + '/' + VOUCHER_MAX;
-    if (chip) {
-      chip.hidden = state.vouchers <= 0;
-      if (pop && state.vouchers > 0) {
-        chip.classList.remove('pop');
-        void chip.offsetWidth;
-        chip.classList.add('pop');
+  /* 刷新四种道具的计数与按钮状态。
+     popType 给定时，只让那一种的计数弹一下。 */
+  function paintInventory(pop, popType) {
+    for (let i = 0; i < ITEM_TYPES.length; i++) {
+      const type = ITEM_TYPES[i];
+      const cntEl = document.getElementById('cnt-' + type);
+      if (cntEl) {
+        cntEl.textContent = itemCount(type) + '/' + itemMax(type);
+        if (pop && popType === type) {
+          cntEl.classList.remove('pop');
+          void cntEl.offsetWidth;
+          cntEl.classList.add('pop');
+        }
+      }
+      const btn = document.getElementById('btn-' + type);
+      if (btn) {
+        /* 护盾用掉后本局不再可用 */
+        const usable = type === 'shield'
+          ? (itemCount('shield') > 0 && !state.shieldUsedThisRun)
+          : itemCount(type) > 0;
+        btn.disabled = !usable || state.over;
+        const armed = (type === 'hammer' && state.hammerMode)
+                   || (type === 'magnet' && state.magnetMode)
+                   || (type === 'shield' && state.shield && state.shield.active);
+        btn.setAttribute('aria-pressed', String(!!armed));
+        btn.classList.toggle('is-armed', !!armed);
       }
     }
-    if (btn) {
-      const can = state.vouchers > 0 && !state.over;
-      btn.disabled = !can;
-      btn.setAttribute('aria-pressed', String(state.hammerMode));
-      btn.classList.toggle('is-armed', state.hammerMode);
+    /* 护盾的剩余时间单独显示 */
+    paintShieldTimer();
+  }
+
+  /* —— 道具菜单：一个入口按钮 + 悬浮面板 —— */
+
+  function itemMenuOpen() {
+    const m = document.getElementById('itemMenu');
+    return !!(m && !m.hidden);
+  }
+
+  function setItemMenu(open) {
+    const m = document.getElementById('itemMenu');
+    const b = document.getElementById('itemMenuBtn');
+    if (!m || !b) return;
+
+    if (open) {
+      /* 顺序很关键：先显示（否则量不到尺寸）→ 立刻按按钮位置摆好 →
+         再让 paintInventory 刷新内容。中间任何一步都不能让菜单停在默认坐标。 */
+      m.hidden = false;
+      paintInventory(false);
+      positionItemMenu();
+    } else {
+      m.hidden = true;
     }
+    b.setAttribute('aria-expanded', String(!!open));
+    b.classList.toggle('is-armed', !!open);
+  }
+
+  /* 把菜单摆在按钮旁边：优先向上弹（不挡棋盘），
+     上方空间不够就向下弹；左右夹在视口内。 */
+  /* 把菜单移到 body 末尾：彻底避开 .panel / .stage 的 overflow 裁切。
+     只在第一次需要时移动，之后固定在那里。 */
+  function ensureMenuAtBody() {
+    const m = document.getElementById('itemMenu');
+    if (!m || m.parentElement === document.body) return;
+    document.body.appendChild(m);
+    m.classList.add('is-floating');
+  }
+
+  function positionItemMenu() {
+    ensureMenuAtBody();
+    const m = document.getElementById('itemMenu');
+    const b = document.getElementById('itemMenuBtn');
+    if (!m || !b || m.hidden) return;
+
+    const br = b.getBoundingClientRect();
+    const mw = m.offsetWidth || 150;
+    const mh = m.offsetHeight || 180;
+    const vw = window.innerWidth || W;
+    const vh = window.innerHeight || H;
+    const GAP = 8;
+
+    /* 菜单挂在 body 下、用 fixed 定位 → 直接用视口坐标 */
+
+    /* 上下：优先向上。但如果按钮上方空间不足（典型情况：窄屏顶部信息条
+       贴着屏幕顶，向上弹会跑到棋盘里被裁掉），就改成向下。 */
+    let absTop = br.top - mh - GAP;
+    if (absTop < GAP) absTop = br.bottom + GAP;
+    if (absTop + mh > vh - GAP) absTop = Math.max(GAP, vh - mh - GAP);
+
+    /* 左右：右对齐按钮，再夹进视口 */
+    let absLeft = br.right - mw;
+    if (absLeft < GAP) absLeft = GAP;
+    if (absLeft + mw > vw - GAP) absLeft = Math.max(GAP, vw - mw - GAP);
+
+    m.style.top = Math.round(absTop) + 'px';
+    m.style.left = Math.round(absLeft) + 'px';
+    m.style.right = 'auto';
+    m.style.bottom = 'auto';
+  }
+
+  function toggleItemMenu() {
+    setItemMenu(!itemMenuOpen());
+  }
+
+  /* 兼容旧名字：老代码/测试仍可能调用 paintVouchers */
+  function paintVouchers(pop) { paintInventory(pop, 'hammer'); }
+
+  /* 护盾激活时显示剩余秒数 */
+  function paintShieldTimer() {
+    const el = document.getElementById('shieldTimer');
+    if (!el) return;
+    if (state.shield && state.shield.active) {
+      const left = Math.max(0, (state.shield.until - nowMs()) / 1000);
+      el.hidden = false;
+      el.textContent = '🫧 护盾 ' + left.toFixed(1) + 's';
+    } else {
+      el.hidden = true;
+    }
+  }
+
+  /* 单调时钟（毫秒）：护盾按真实时间计时，用 performance.now() */
+  function nowMs() {
+    return (typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now();
   }
 
   /* 锤子模式下的提示条 */
   function paintHammerHint() {
     const hint = document.getElementById('hammerHint');
     if (!hint) return;
-    hint.hidden = !state.hammerMode;
-    if (state.hammerMode) hint.textContent = '选择一只静止的奶蛙，Esc 取消';
+    if (state.hammerMode) {
+      hint.hidden = false;
+      hint.textContent = '选择一只静止的奶蛙，Esc 取消';
+    } else if (state.magnetMode) {
+      hint.hidden = false;
+      hint.textContent = '选择一只水果，向附近的水果堆靠拢，Esc 取消';
+    } else {
+      hint.hidden = true;
+    }
   }
 
   /* 每累计 REVIVE_STEP 分，发一枚复活币 */
@@ -851,15 +1007,86 @@
                    || band.triple >= COMBO_TRIPLE_NEED;
     if (!qualified) return;                    // 没合格，静默关闭
 
-    if (state.vouchers < VOUCHER_MAX) {
-      state.vouchers++;
-      paintVouchers(true);
-      state.floats.push({ x: W / 2, y: 250, text: '+1 道具券', life: 1.4, big: true });
-      Sound.merge(7);
-    } else {
-      /* 满额：改发 +100 分。刻意不推进券进度、不触发新的里程碑结算。 */
-      payoutOverflow(m);
+    /* 合格：先抽签（在检查库存之前抽，且绝不重抽/替换），再决定发放还是补偿 */
+    awardRandomItem();
+  }
+
+  /* ---------------------------------------------------------
+   *  道具库存：四类独立计数
+   * ------------------------------------------------------- */
+
+  function itemCount(type) {
+    return state.inventory[type] || 0;
+  }
+
+  function itemMax(type) {
+    return ITEM_MAX[type] || 0;
+  }
+
+  /* 该道具此刻还能不能再拿一个 */
+  function canHoldItem(type) {
+    if (type === 'shield') {
+      /* 护盾：本局用过就永远不再给；已经拿着一个也算满 */
+      if (state.shieldUsedThisRun) return false;
+      return itemCount('shield') < 1;
     }
+    return itemCount(type) < itemMax(type);
+  }
+
+  /* 加一个道具。返回 true 表示真的加上了。 */
+  function addItem(type) {
+    if (!canHoldItem(type)) return false;
+    state.inventory[type] = itemCount(type) + 1;
+    paintInventory(true, type);
+    return true;
+  }
+
+  /* 消耗一个道具。返回 true 表示扣成功。 */
+  function consumeItem(type) {
+    if (itemCount(type) <= 0) return false;
+    state.inventory[type] = itemCount(type) - 1;
+    paintInventory(true, type);
+    return true;
+  }
+
+  /* 道具被用掉后收起菜单，让玩家回到棋盘 */
+  function closeMenuAfterUse() {
+    setItemMenu(false);
+  }
+
+  /* 随机抽签用的可注入随机源：测试里可以替换它来强制每种结果 */
+  let itemRandom = Math.random;
+
+  /* 设置随机源（仅测试/调试用） */
+  function setItemRandom(fn) {
+    itemRandom = (typeof fn === 'function') ? fn : Math.random;
+  }
+
+  /* 均匀抽一种道具。抽签发生在检查库存之前，绝不重抽。 */
+  function drawItemType() {
+    let r = Number(itemRandom());
+    if (!isFinite(r)) r = 0;
+    if (r < 0) r = 0;
+    if (r >= 1) r = 0.999999;
+    const idx = Math.floor(r * ITEM_TYPES.length);
+    return ITEM_TYPES[idx];
+  }
+
+  /* 里程碑合格时调用：抽一种道具，能装就装，装不下就 +100 分补偿 */
+  function awardRandomItem() {
+    const type = drawItemType();
+    if (addItem(type)) {
+      state.floats.push({
+        x: W / 2, y: 250,
+        text: '+1 ' + ITEM_LABEL[type], life: 1.4, chain: true
+      });
+      Sound.merge(7);
+      return type;
+    }
+    /* 装不下（已达上限 / 护盾本局已用）：发 +100 分补偿。
+       补偿不推进券进度、不产生连击、不递归结算。 */
+    payoutOverflow();
+    return null;
   }
 
   /* ---------------------------------------------------------
@@ -900,7 +1127,8 @@
     /* 原子操作：先作废本局，再补资源 */
     taintRun();
 
-    state.vouchers = SECRET_VOUCHERS;             // 补满到上限，不会超过
+    /* 隐藏发放只补锤子，不碰其它道具库存 */
+    state.inventory.hammer = SECRET_HAMMERS;
     state.revives += SECRET_REVIVES;              // 送 2 枚复活币
     paintVouchers(true);
     paintRevives(true);
@@ -1029,7 +1257,7 @@
   }
 
   /* 满额奖励：只改可见分数与最高分，不动 voucherProgress，也不递归结算 */
-  function payoutOverflow(m) {
+  function payoutOverflow() {
     state.score += VOUCHER_OVERFLOW_SCORE;
     updateBestIfEligible();
     scoreEl.textContent = state.score;
@@ -1368,7 +1596,7 @@
   /* 进入/退出锤子瞄准模式 */
   function setHammerMode(on) {
     if (on) {
-      if (state.over || state.vouchers <= 0) return false;
+      if (state.over || itemCount('hammer') <= 0) return false;
       state.hammerMode = true;
       state.hammerHover = null;
       Sound.ensure();
@@ -1401,7 +1629,7 @@
       });
       return false;      // 不消耗、不退出
     }
-    if (state.vouchers <= 0) { setHammerMode(false); return false; }
+    if (itemCount('hammer') <= 0) { setHammerMode(false); return false; }
 
     /* 二次校验：物理一直在跑，点到这一刻再确认一次 */
     if (!isHammerTarget(target)) {
@@ -1412,13 +1640,218 @@
     const tx = target.x, ty = target.y, tt = target.tier;
     if (!removeBall(target, 'hammer')) return false;   // 已被移走：不消耗
 
-    state.vouchers--;
-    paintVouchers(true);
+    consumeItem('hammer');
     burst(tx, ty, tt, 12 + tt * 2, 180 + tt * 20);
     Sound.merge(Math.min(tt + 2, MAX_TIER));
     haptic(20);
     state.floats.push({ x: tx, y: ty - 20, text: '砸掉一只', life: 1.0 });
     setHammerMode(false);          // 用完自动退出
+    return true;
+  }
+
+  /* ---------------------------------------------------------
+   *  Stage 4 第二阶段：磁铁 / 风扇 / 泡泡护盾
+   * ------------------------------------------------------- */
+
+  /* —— 磁铁 —— */
+
+  /* 找出「局部密集区」：在选中水果周围 MAGNET_RADIUS 内、
+     除它以外的存活水果的质心。返回 null 表示附近没有别的水果。 */
+  function magnetLocalTarget(sel) {
+    let sx = 0, sy = 0, n = 0;
+    const r2 = MAGNET_RADIUS * MAGNET_RADIUS;
+    for (let i = 0; i < state.balls.length; i++) {
+      const b = state.balls[i];
+      if (b.dead || b === sel) continue;
+      const dx = b.x - sel.x, dy = b.y - sel.y;
+      if (dx * dx + dy * dy > r2) continue;
+      sx += b.x; sy += b.y; n++;
+    }
+    if (!n) return null;
+    return { x: sx / n, y: sy / n, count: n };
+  }
+
+  /* 在磁铁瞄准态里选中一只水果并启动吸附 */
+  function magnetSelect(b) {
+    if (!state.magnetMode) return false;
+    if (state.over) { setMagnetMode(false); return false; }
+    if (!b || b.dead || state.balls.indexOf(b) < 0) return false;
+    if (itemCount('magnet') <= 0) return false;
+    /* 同一时间只允许一个吸附效果 */
+    if (state.magnet && state.magnet.active) return false;
+
+    const t = magnetLocalTarget(b);
+    if (!t) {
+      state.floats.push({ x: b.x, y: b.y - b.r - 14, text: '附近没有别的水果', life: 1.2 });
+      return false;      // 不消耗、不退出
+    }
+
+    if (!consumeItem('magnet')) return false;
+    state.magnet = {
+      active: true, target: b, until: state.clock + MAGNET_DURATION,
+      tx: t.x, ty: t.y
+    };
+    state.floats.push({ x: b.x, y: b.y - b.r - 14, text: '磁铁吸附', life: 1.0 });
+    Sound.merge(5);
+    haptic(12);
+    setMagnetMode(false);
+    return true;
+  }
+
+  /* 每个物理子步调用：给被吸附的水果一个指向密集区的有限加速度 */
+  function applyMagnetForce(dt) {
+    const m = state.magnet;
+    if (!m || !m.active) return;
+    const b = m.target;
+    if (!b || b.dead || state.balls.indexOf(b) < 0) {
+      m.active = false; state.magnet = null; return;   // 目标没了，效果结束
+    }
+    if (state.clock >= m.until) {
+      m.active = false; state.magnet = null; return;
+    }
+    /* 目标随附近水果移动而更新 */
+    const t = magnetLocalTarget(b);
+    if (t) { m.tx = t.x; m.ty = t.y; }
+
+    let dx = m.tx - b.x, dy = m.ty - b.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1) return;
+    dx /= d; dy /= d;
+    /* 距离越近加速度越小，避免贴脸时抖 */
+    const falloff = Math.min(1, d / MAGNET_RADIUS);
+    let ax = dx * MAGNET_ACCEL * falloff;
+    let ay = dy * MAGNET_ACCEL * falloff;
+    b.vx += ax * dt;
+    b.vy += ay * dt;
+    /* 速度上限：防止失控 */
+    const sp = Math.hypot(b.vx, b.vy);
+    if (sp > MAGNET_MAX_SPEED) {
+      const k = MAGNET_MAX_SPEED / sp;
+      b.vx *= k; b.vy *= k;
+    }
+  }
+
+  /* —— 小风扇 —— */
+
+  /* 用一次风扇：对当前所有存活水果施加水平气流 */
+  function useFan() {
+    if (state.over) return false;
+    if (itemCount('fan') <= 0) return false;
+    if (state.fan && state.fan.active) return false;   // 不叠加
+    if (!consumeItem('fan')) return false;
+
+    const dir = state.fanNextDir;              // -1 左 / +1 右
+    state.fanNextDir = -dir;                   // 下次反向
+    state.fan = { active: true, dir: dir, until: state.clock + FAN_DURATION };
+    state.floats.push({
+      x: W / 2, y: 120,
+      text: dir < 0 ? '风扇 ←' : '风扇 →', life: 1.0, chain: true
+    });
+    Sound.merge(4);
+    haptic(10);
+    paintInventory(true, 'fan');
+    return true;
+  }
+
+  /* 每个物理子步调用：给所有存活水果加水平加速度（有速度贡献上限） */
+  function applyFanForce(dt) {
+    const f = state.fan;
+    if (!f || !f.active) return;
+    if (state.clock >= f.until) { f.active = false; state.fan = null; return; }
+    const ax = f.dir * FAN_ACCEL;
+    for (let i = 0; i < state.balls.length; i++) {
+      const b = state.balls[i];
+      if (b.dead) continue;
+      b.vx += ax * dt;
+      /* 单次气流造成的水平速度贡献不超过上限 */
+      const added = f.dir * b.vx;      // 同向为正
+      if (added > FAN_MAX_ADDED_VX) {
+        b.vx = f.dir * FAN_MAX_ADDED_VX;
+      }
+    }
+  }
+
+  /* —— 泡泡护盾 —— */
+
+  /* 护盾是否处于激活中（按真实时间判断） */
+  function shieldActive() {
+    return !!(state.shield && state.shield.active);
+  }
+
+  /* 统一的护盾激活入口：手动和自动都走这里。
+     source: 'manual' | 'auto'。返回 true 表示真的激活了。 */
+  function activateShield(source) {
+    if (state.over) return false;
+    if (state.shieldUsedThisRun) return false;
+    if (itemCount('shield') <= 0) return false;
+    if (shieldActive()) return false;
+
+    /* 扣掉库存并标记本局已用 */
+    consumeItem('shield');
+    state.shieldUsedThisRun = true;
+    state.shield = {
+      active: true,
+      until: nowMs() + SHIELD_DURATION * 1000,   // 真实时间（单调时钟）
+      source: source || 'manual'
+    };
+    paintInventory(false);
+    paintShieldTimer();
+    state.floats.push({
+      x: W / 2, y: 170,
+      text: source === 'auto' ? '危险！泡泡护盾已自动触发' : '泡泡护盾启动',
+      life: 1.5, chain: true
+    });
+    Sound.bonus();
+    haptic(30);
+    return true;
+  }
+
+  /* 每个 update 开头调用：处理护盾到期（必须在危险检查之前） */
+  function updateShield() {
+    const sh = state.shield;
+    if (!sh || !sh.active) return;
+    if (nowMs() >= sh.until) {
+      /* 到期：清掉护盾，但**不给**任何水果重置 overTime ——
+         每颗水果带着它原本的 overTime 继续倒数。 */
+      sh.active = false;
+      state.shield = null;
+      paintShieldTimer();
+      paintInventory(false);
+    }
+  }
+
+  /* 危险检查前的自动触发：找出最紧迫的那颗水果，剩余 ≤ 0.5 秒就自动开盾 */
+  function maybeAutoShield() {
+    if (state.over) return false;
+    if (state.shieldUsedThisRun) return false;
+    if (itemCount('shield') <= 0) return false;
+    if (shieldActive()) return false;
+
+    let minRemain = Infinity;
+    for (let i = 0; i < state.balls.length; i++) {
+      const b = state.balls[i];
+      if (b.dead || !b.landed) continue;
+      if (b.y - b.r >= DANGER_Y) continue;              // 不在线上方
+      const v2 = b.vx * b.vx + b.vy * b.vy;
+      if (v2 >= REST_SPEED2) continue;                  // 还在飞，不计时
+      const remain = Math.max(0, OVER_LIMIT - b.overTime);
+      if (remain < minRemain) minRemain = remain;
+    }
+    if (minRemain <= SHIELD_AUTO_WINDOW) return activateShield('auto');
+    return false;
+  }
+
+  /* 磁铁瞄准态开关 */
+  function setMagnetMode(on) {
+    if (on) {
+      if (state.over || itemCount('magnet') <= 0) return false;
+      if (state.hammerMode) setHammerMode(false);   // 与锤子互斥
+      state.magnetMode = true;
+    } else {
+      state.magnetMode = false;
+    }
+    paintInventory(false);
+    paintHammerHint();
     return true;
   }
 
@@ -1441,6 +1874,20 @@
   }
 
   function checkGameOver(dt) {
+    /* 护盾激活期间：危险计时**完全暂停** —— 既不加也不减，
+       每颗水果保留自己的 overTime 与 dangerPeak。
+       物理、碰撞、合成照常；线上方的危险视觉也照常显示。 */
+    if (shieldActive()) {
+      let anyDanger = false;
+      for (let i = 0; i < state.balls.length; i++) {
+        const b = state.balls[i];
+        if (b.dead || !b.landed) continue;
+        if (b.y - b.r < DANGER_Y) anyDanger = true;
+      }
+      state.danger = anyDanger;
+      return;
+    }
+
     let danger = false;
     for (let i = 0; i < state.balls.length; i++) {
       const b = state.balls[i];
@@ -1552,8 +1999,9 @@
 
   function gameOver() {
     state.over = true;
-    /* 判负时先退出锤子瞄准态，再走原有的结束/复活流程 */
+    /* 判负时先退出所有瞄准态，再走原有的结束/复活流程 */
     if (state.hammerMode) setHammerMode(false);
+    if (state.magnetMode) setMagnetMode(false);
     finalScoreEl.textContent = state.score;
     finalBestEl.textContent = state.best;
     Sound.over();
@@ -1651,7 +2099,16 @@
     state.cascadeY = 0;
     state.clock = 0;
 
-    /* 道具券清零（复活不清，重开才清） */
+    /* 道具库存与效果清零（复活不清，重开才清） */
+    state.inventory = { hammer: 0, magnet: 0, fan: 0, shield: 0 };
+    state.shieldUsedThisRun = false;
+    state.magnet = null;
+    state.fan = null;
+    state.fanNextDir = -1;
+    state.shield = null;
+    state.magnetMode = false;
+
+    /* 旧的共享券计数（已被 inventory 取代，保留字段以免老测试崩溃） */
     state.vouchers = 0;
     state.voucherProgress = 0;
     state.voucherMilestone = 0;
@@ -1691,7 +2148,7 @@
     drawNext();
     drawChain();              // 图鉴剪影跟着重画
     paintStats();
-    paintVouchers(false);
+    paintInventory(false);
     Sound.ensure();
   }
 
@@ -2153,7 +2610,12 @@
     const sub = dt / SUBSTEPS;
     for (let s = 0; s < SUBSTEPS; s++) stepPhysics(sub);
 
+    /* 护盾：先处理到期（用真实时间），再判断要不要自动触发，
+       最后才做危险检查 —— 顺序很关键，保证自动触发一定早于判负。 */
+    updateShield();
+    maybeAutoShield();
     checkGameOver(dt);
+    paintShieldTimer();
     if (state.flash > 0) state.flash = Math.max(0, state.flash - dt * 2.2);
   }
 
@@ -2229,6 +2691,9 @@
       return;
     }
 
+    /* 磁铁瞄准态：同样不移动准星 */
+    if (state.magnetMode) return;
+
     if (e.pointerType === 'touch' && !touchAiming) return;
     moveAim(pointerToX(e.clientX));
     if (e.pointerType === 'touch') trackTouch(pointerToX(e.clientX));
@@ -2242,6 +2707,15 @@
     if (state.hammerMode) {
       const pt = pointerToPoint(e.clientX, e.clientY);
       hammerClickAt(pt.x, pt.y);
+      e.preventDefault();
+      return;
+    }
+
+    /* 磁铁瞄准态：点一只水果开始吸附；点空白不消耗也不退出 */
+    if (state.magnetMode) {
+      const pt = pointerToPoint(e.clientX, e.clientY);
+      const picked = pickAnyFruitAt(pt.x, pt.y);
+      if (picked) magnetSelect(picked);
       e.preventDefault();
       return;
     }
@@ -2266,6 +2740,7 @@
     touchAiming = false;
     if (state.over) return;
     if (state.hammerMode) return;      // 锤子态下松手不投放
+    if (state.magnetMode) return;      // 磁铁态下松手也不投放
     moveAim(pointerToX(e.clientX));
     trackTouch(pointerToX(e.clientX));
     state.finesse = finesseFromTrack();       // 松手这一下才把冲量算进去
@@ -2317,6 +2792,17 @@
     if (isTyping(e)) return;
     if (isModalOpen()) return;
 
+    /* 磁铁瞄准态：Esc 取消；其余按键不投放 */
+    if (state.magnetMode) {
+      if (e.code === 'Escape' || e.key === 'Escape') {
+        setMagnetMode(false);
+        e.preventDefault();
+        return;
+      }
+      e.preventDefault();
+      return;
+    }
+
     /* 锤子瞄准态：Esc 取消；空格/回车/方向键一律不投放 */
     if (state.hammerMode) {
       if (e.code === 'Escape' || e.key === 'Escape') {
@@ -2329,6 +2815,13 @@
         return;
       }
       /* 其余按键（方向键微调、R 重开）也一并不放行，避免误操作 */
+      e.preventDefault();
+      return;
+    }
+
+    /* Esc 收起道具菜单（放在瞄准态之后：瞄准态的 Esc 优先处理） */
+    if (itemMenuOpen() && (e.code === 'Escape' || e.key === 'Escape')) {
+      setItemMenu(false);
       e.preventDefault();
       return;
     }
@@ -2458,15 +2951,58 @@
     if (reviveWideBtn) reviveWideBtn.addEventListener('click', () => revive('wide'));
     if (giveUpBtn) giveUpBtn.addEventListener('click', settle);
 
-    /* 锤子按钮：点一下进入/退出瞄准态 */
-    const hammerBtn = document.getElementById('hammerBtn');
+    /* 道具菜单入口 */
+    const menuBtn = document.getElementById('itemMenuBtn');
+    if (menuBtn) {
+      menuBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleItemMenu();
+      });
+    }
+    /* 点面板外面收起菜单（不拦截棋盘本身的操作） */
+    document.addEventListener('click', (e) => {
+      if (!itemMenuOpen()) return;
+      const wrap = document.querySelector('.item-menu-wrap');
+      if (wrap && wrap.contains(e.target)) return;
+      setItemMenu(false);
+    });
+
+    /* 四个道具按钮 */
+    const hammerBtn = document.getElementById('btn-hammer');
     if (hammerBtn) {
       hammerBtn.addEventListener('click', (e) => {
         e.preventDefault();
         toggleHammerMode();
+        closeMenuAfterUse();
       });
     }
-    paintVouchers(false);
+    const magnetBtn = document.getElementById('btn-magnet');
+    if (magnetBtn) {
+      magnetBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (state.magnetMode) setMagnetMode(false);
+        else setMagnetMode(true);
+        closeMenuAfterUse();
+      });
+    }
+    const fanBtn = document.getElementById('btn-fan');
+    if (fanBtn) {
+      fanBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        useFan();
+        closeMenuAfterUse();
+      });
+    }
+    const shieldBtn = document.getElementById('btn-shield');
+    if (shieldBtn) {
+      shieldBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        activateShield('manual');
+        closeMenuAfterUse();
+      });
+    }
+    paintInventory(false);
     paintHammerHint();
     bindSecretDialog();
     paintRunTainted();
@@ -2503,7 +3039,20 @@
                      openSecretDialog, closeSecretDialog, secretDialogOpen,
                      submitSecret, paintRunTainted, updateBestIfEligible,
                      SECRET_PASS, SECRET_CLICKS, SECRET_WINDOW,
-                     SECRET_VOUCHERS, SECRET_REVIVES,
+                     SECRET_HAMMERS, SECRET_REVIVES,
+                     /* Stage 4 第二阶段：道具库存与三种新道具 */
+                     ITEM_TYPES, ITEM_MAX, ITEM_LABEL,
+                     itemCount, itemMax, canHoldItem, addItem, consumeItem, paintInventory,
+                     drawItemType, awardRandomItem, setItemRandom,
+                     magnetSelect, magnetLocalTarget, setMagnetMode, applyMagnetForce,
+                     useFan, applyFanForce,
+                     activateShield, updateShield, maybeAutoShield, shieldActive,
+                     paintShieldTimer, nowMs,
+                     itemMenuOpen, setItemMenu, toggleItemMenu, closeMenuAfterUse,
+                     positionItemMenu,
+                     MAGNET_RADIUS, MAGNET_DURATION, MAGNET_ACCEL, MAGNET_MAX_SPEED,
+                     FAN_DURATION, FAN_ACCEL, FAN_MAX_ADDED_VX,
+                     SHIELD_DURATION, SHIELD_AUTO_WINDOW,
                      unlockTier, isDiscovered, loadDiscovery, saveDiscovery, reloadDiscovery,
                      paintStats,
                      paintReviveChoices, clearForRevive, topFirstOrder, drawChain, drawSilhouette,

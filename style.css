@@ -176,6 +176,7 @@ body {
   flex-direction: column;
   gap: 14px;
   padding: 20px;
+  overflow: visible;      /* 道具菜单要能弹到面板外 */
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, .8);
   background: var(--card);
@@ -896,32 +897,101 @@ body {
 
 /* ---------------- 道具券与锤子（Stage 4）---------------- */
 
-/* 券计数胶囊：和复活币胶囊同款，压在它下面 */
-.voucher-chip {
-  position: absolute;
-  left: 10px;
-  top: 40px;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.4;
-  font-variant-numeric: tabular-nums;
-  color: #4a3a12;
-  background: linear-gradient(135deg, #d9f0ff, #a8d8f5);
-  box-shadow: 0 3px 10px rgba(30, 110, 160, .28), inset 0 1px 0 rgba(255, 255, 255, .75);
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-select: none;
+/* 道具菜单：一个入口按钮 + 点击展开的悬浮面板 */
+.item-menu-wrap {
+  position: relative;      /* 面板相对它定位 */
+  flex: 0 0 auto;
 }
 
-.voucher-chip-ico { font-size: 12px; }
+.item-menu {
+  /* 菜单会被 JS 移到 <body> 下（见 ensureMenuAtBody），
+     这样不受 .panel / .stage 的 overflow 裁切影响，用 fixed 视口坐标定位。 */
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 148px;
+  max-width: min(220px, calc(100vw - 16px));
+  /* 默认贴右下角：万一 JS 还没算出坐标，也不会撑出横向滚动 */
+  top: 0;
+  left: 0;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(255, 252, 246, .98);
+  box-shadow: 0 16px 40px rgba(60, 32, 12, .3), 0 0 0 1px rgba(214, 160, 96, .28);
+  transform-origin: bottom right;
+  animation: itemMenuIn .16s ease-out;
+}
 
-.voucher-chip.pop { animation: revivePop .5s cubic-bezier(.2, .9, .3, 1.5); }
+@keyframes itemMenuIn {
+  from { opacity: 0; transform: translateY(6px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item-menu { animation: none; }
+}
+
+.item-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(214, 160, 96, .35);
+  border-radius: 11px;
+  background: linear-gradient(135deg, #fff6e6, #ffe9c9);
+  color: #7a3c00;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s ease, transform .12s ease;
+}
+
+.item-menu-row:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fff0d2, #ffdca8);
+  transform: translateX(-1px);
+}
+
+.item-menu-row:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+  filter: grayscale(.4);
+}
+
+.item-menu-row.is-armed {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #ff8a5c, #f4623a 60%, #d8401c);
+}
+
+.item-menu-row .mi { font-size: 15px; }
+.item-menu-row .mt { flex: 1 1 auto; text-align: left; }
+.item-menu-row b {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.item-menu-row b.pop { animation: revivePop .5s cubic-bezier(.2, .9, .3, 1.5); }
+
+/* 护盾剩余时间 */
+.shield-timer {
+  position: absolute;
+  left: 50%;
+  top: 40px;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(90, 180, 240, .95), rgba(60, 130, 220, .95));
+  box-shadow: 0 4px 14px rgba(30, 90, 160, .4);
+  pointer-events: none;
+}
 
 /* 锤子瞄准态的提示条：压在棋盘顶部中间 */
 .hammer-hint {
@@ -941,25 +1011,25 @@ body {
   pointer-events: none;
 }
 
-/* 锤子按钮：和音效按钮同尺寸，启用时用暖色区分 */
-.btn.btn-hammer {
+/* 道具按钮：和音效按钮同尺寸，启用时用暖色区分 */
+.btn.btn-item {
   color: #7a3c00;
   border-color: rgba(214, 140, 60, .5);
   background: linear-gradient(135deg, #ffe0b0, #ffc078);
 }
 
-.btn.btn-hammer:hover:not(:disabled) {
+.btn.btn-item:hover:not(:disabled) {
   box-shadow: 0 8px 20px rgba(230, 140, 40, .32);
 }
 
-.btn.btn-hammer:disabled {
+.btn.btn-item:disabled {
   opacity: .42;
   cursor: not-allowed;
   filter: grayscale(.4);
 }
 
-/* 进入瞄准态：按钮高亮，表示「正在等目标」 */
-.btn.btn-hammer.is-armed {
+/* 进入瞄准态 / 效果激活：按钮高亮 */
+.btn.btn-item.is-armed {
   color: #fff;
   border-color: transparent;
   background: linear-gradient(135deg, #ff8a5c, #f4623a 60%, #d8401c);
@@ -1045,7 +1115,7 @@ body {
 
 @media (max-width: 860px) {
   :root {
-    --topbar: 68px;   /* 顶部信息条 + 间隙的大致占高 */
+    --topbar: 104px;  /* 顶部信息条（两行：分数 + 按钮）+ 间隙 */
     --foot: 52px;     /* 页脚 + 间隙的大致占高 */
   }
 
@@ -1080,6 +1150,27 @@ body {
     border-radius: 20px;
   }
 
+  /* 窄屏：菜单更紧凑；位置同样由 JS 按按钮算 */
+  .item-menu {
+    min-width: 132px;
+    padding: 6px;
+  }
+
+  .item-menu-row {
+    padding: 7px 9px;
+    font-size: 12.5px;
+  }
+
+  /* 窄屏：护盾倒计时贴右侧 */
+  .shield-timer {
+    left: auto;
+    right: 10px;
+    transform: none;
+    top: 40px;
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
   /* 窄屏页脚：字更小、更紧凑，不抢棋盘空间 */
   .page-foot {
     width: 100%;
@@ -1104,9 +1195,10 @@ body {
      分数卡片保持紧凑，按钮压成窄图标按钮，两边都留出足够宽度。 */
   .panel {
     flex-direction: row;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;          /* 道具变多，窄屏允许折行 */
     align-items: stretch;
     gap: 5px;
+    overflow: visible;        /* 让道具菜单能弹出到面板外 */
     width: 100%;
     max-width: calc(96vw * 700 / 420);
     padding: 8px 10px;
@@ -1142,7 +1234,7 @@ body {
   .tips { display: none; }
 
   .stats {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     display: flex;
     gap: 5px;
     min-width: 0;
@@ -1179,7 +1271,7 @@ body {
   }
 
   /* 只有图标按钮时，把文字标签藏起来，图标居中 */
-  .actions .btn-hammer .lbl,
+  .actions .btn-item .lbl,
   .actions .btn:not(.btn-wide) .lbl { display: none; }
   .actions .btn .ico { margin-right: 0; }
 
@@ -1197,14 +1289,15 @@ body {
   .actions {
     flex: 0 0 auto;
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
   }
 
-  /* 四个按钮压成 34px 的方形图标按钮 */
+  /* 道具按钮压成 32px 的方形图标按钮 */
   .actions .btn {
     flex: 0 0 auto;
-    width: 34px;
-    min-width: 34px;
+    width: 32px;
+    min-width: 32px;
     padding: 0;
     font-size: 15px;
   }

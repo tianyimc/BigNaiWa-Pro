@@ -201,13 +201,13 @@ eq(els.secretModal.getAttribute('aria-hidden'), 'true', 'aria-hidden=true');
 /* 错误口令：状态不变 */
 G.reset();
 const snap = JSON.stringify({
-  v: G.state.vouchers, r: G.state.revives, s: G.state.score,
+  v: G.state.inventory.hammer, r: G.state.revives, s: G.state.score,
   t: G.state.runTainted, b: G.state.best
 });
 els.secretInput.value = 'wrong';
 G.submitSecret();
 eq(JSON.stringify({
-  v: G.state.vouchers, r: G.state.revives, s: G.state.score,
+  v: G.state.inventory.hammer, r: G.state.revives, s: G.state.score,
   t: G.state.runTainted, b: G.state.best
 }), snap, '错误口令不改变任何状态');
 ok(els.secretMsg.textContent.length > 0, '错误口令给出提示：' + els.secretMsg.textContent);
@@ -221,10 +221,10 @@ eq(els.secretModal.classList.contains('show'), false, '成功后弹窗关闭');
 
 /* 取消不改变状态 */
 G.reset();
-const snap2 = JSON.stringify({ v: G.state.vouchers, r: G.state.revives, t: G.state.runTainted });
+const snap2 = JSON.stringify({ v: G.state.inventory.hammer, r: G.state.revives, t: G.state.runTainted });
 G.openSecretDialog();
 els.secretCancel.fire('click', { preventDefault() {}, target: els.secretCancel });
-eq(JSON.stringify({ v: G.state.vouchers, r: G.state.revives, t: G.state.runTainted }),
+eq(JSON.stringify({ v: G.state.inventory.hammer, r: G.state.revives, t: G.state.runTainted }),
    snap2, '取消不改变状态');
 eq(els.secretModal.classList.contains('show'), false, '取消后弹窗关闭');
 
@@ -241,35 +241,35 @@ console.log('\n[C] 发放内容');
 
 /* 从 0 张券开始 */
 G.reset();
-G.state.vouchers = 0;
+G.state.inventory.hammer = 0;
 G.state.revives = 0;
 G.applySecretGrant(G.SECRET_PASS);
-eq(G.state.vouchers, 2, '0 张 → 补满到 2');
+eq(G.state.inventory.hammer, 2, '0 个锤子 → 补满到 2');
 eq(G.state.revives, 2, '复活币 +2');
 
 /* 从 1 张券开始 */
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 G.state.revives = 0;
 G.applySecretGrant(G.SECRET_PASS);
-eq(G.state.vouchers, 2, '1 张 → 补满到 2');
+eq(G.state.inventory.hammer, 2, '1 个锤子 → 补满到 2');
 eq(G.state.revives, 2, '复活币 +2');
 
 /* 从 2 张券开始：不超上限 */
 G.reset();
-G.state.vouchers = 2;
+G.state.inventory.hammer = 2;
 G.state.revives = 0;
 G.applySecretGrant(G.SECRET_PASS);
-eq(G.state.vouchers, 2, '2 张 → 仍然是 2（不超上限）');
+eq(G.state.inventory.hammer, 2, '2 个锤子 → 仍然是 2（不超上限）');
 eq(G.state.revives, 2, '复活币仍然 +2');
 
 /* 重复使用：券不超上限，复活币每次 +2 */
 G.reset();
-G.state.vouchers = 0;
+G.state.inventory.hammer = 0;
 G.state.revives = 0;
 G.applySecretGrant(G.SECRET_PASS);
 G.applySecretGrant(G.SECRET_PASS);
-eq(G.state.vouchers, 2, '重复使用券仍然不超过 2');
+eq(G.state.inventory.hammer, 2, '重复使用锤子仍然不超过 2');
 eq(G.state.revives, 4, '重复使用复活币累加（2 → 4）');
 
 /* 不给分数/进度/连击奖励 */
@@ -420,7 +420,7 @@ ok(lbSrc.indexOf('正在完善中，敬请期待') >= 0, '占位文案仍在');
 console.log('\n[G] 弹窗输入隔离');
 
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 G.state.ready = true;
 G.state.cooldown = 0;
 
@@ -456,17 +456,17 @@ eq(G.state.balls.length, ballsBefore + 1, '关闭后空格投放恢复正常');
 console.log('\n[H] 回归检查');
 
 G.reset();
-eq(G.state.vouchers, 0, '开局 0 张券');
+eq(G.state.inventory.hammer, 0, '开局 0 个锤子');
 eq(G.state.runTainted, false, '开局未作废');
 
 /* 锤子仍然可用 */
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 const b1 = G.makeBall(200, 500, 3, 0, 0);
 b1.landed = true; b1.contacts = 1; b1.px = b1.x; b1.py = b1.y;
 G.state.balls.push(b1);
 eq(G.setHammerMode(true), true, '锤子仍可进入');
 eq(G.hammerClickAt(200, 500), true, '锤子仍可砸中');
-eq(G.state.vouchers, 0, '锤子照常消耗 1 张券');
+eq(G.state.inventory.hammer, 0, '锤子照常消耗 1 个');
 
 /* 复活币阈值不变 */
 G.reset();

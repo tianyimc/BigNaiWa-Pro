@@ -61,14 +61,18 @@ const IDS = ['game', 'stage', 'overlay', 'score', 'best', 'finalScore', 'finalBe
   'reviveLeft', 'reviveBtn', 'reviveWideBtn', 'reviveWideHint', 'giveUpBtn',
   'reviveBadge', 'reviveCount', 'statCascade', 'statTier', 'statTop', 'statRecovery',
   'statRevive', 'helpBtn', 'helpModal', 'helpClose', 'helpOk', 'helpTitle',
-  'voucherChip', 'voucherCount', 'hammerBtn', 'hammerHint'];
+  'hammerHint', 'shieldTimer',
+  'cnt-hammer', 'cnt-magnet', 'cnt-fan', 'cnt-shield',
+  'btn-hammer', 'btn-magnet', 'btn-fan', 'btn-shield',
+  'itemMenuBtn', 'itemMenu'];
 const els = {};
 IDS.forEach((id) => { els[id] = makeEl(id); });
 els.revivePrompt.hidden = true;
 els.reviveBadge.hidden = true;
-els.voucherChip.hidden = true;
+// (旧 voucherChip 已由 item-chips 取代)
 els.hammerHint.hidden = true;
-els.hammerBtn.disabled = true;
+els.shieldTimer.hidden = true;
+els['btn-hammer'].disabled = true;
 
 const winListeners = {};
 const mem = {};
@@ -147,7 +151,7 @@ console.log('Stage 4 自检：道具券 + 锤子\n');
 console.log('[A] 里程碑边界与结算');
 
 G.reset();
-eq(G.state.vouchers, 0, '开局 0 张券');
+eq(G.state.inventory.hammer, 0, '开局 0 个锤子');
 eq(G.state.voucherProgress, 0, '开局进度分 0');
 
 /* 499 / 500 / 501 —— 但里程碑要合格才发券，这里先只验进度分推进 */
@@ -180,7 +184,7 @@ eq(G.state.voucherProgress, 1600, '进度分等于累计得分');
 G.reset();
 eq(G.state.voucherProgress, 0, '重开后进度分清零');
 eq(G.state.voucherMilestone, 0, '重开后里程碑计数清零');
-eq(G.state.vouchers, 0, '重开后券清零');
+eq(G.state.inventory.hammer, 0, '重开后锤子清零');
 eq(G.state.bandCombos.length, 0, '重开后档位记录清空');
 eq(G.state.pendingMilestones.length, 0, '重开后待结算队列清空');
 
@@ -216,8 +220,12 @@ eq(G.state.bandCombos[0].double, 0, '长度 5 → 不记双连');
 
 /* ============================================================
  * [C] 合格判定与发券
+ *
+ * 第二阶段起里程碑改为「随机抽一种道具」。这里统一把随机源固定成
+ * 抽中锤子，以便继续验证「合格 → 发一个锤子」的旧语义。
  * ========================================================== */
 console.log('\n[C] 合格判定与发券');
+G.setItemRandom(() => 0);        // 0 → 恒抽 hammer
 
 /* 2 次双连 → 不合格 */
 G.reset();
@@ -225,7 +233,7 @@ runCascade(2, 0);
 runCascade(2, 0);
 eq(G.state.bandCombos[0].double, 2, '档位 0 攒了 2 次双连');
 G.addScore(500);                       // 触发节点 1
-eq(G.state.vouchers, 0, '只有 2 次双连 → 不发券');
+eq(G.state.inventory.hammer, 0, '只有 2 次双连 → 不发券');
 
 /* 3 次双连 → 合格，发 1 张 */
 G.reset();
@@ -233,34 +241,35 @@ runCascade(2, 0);
 runCascade(2, 0);
 runCascade(2, 0);
 G.addScore(500);
-eq(G.state.vouchers, 1, '3 次双连 → 发 1 张券');
+eq(G.state.inventory.hammer, 1, '3 次双连 → 发 1 张券');
 
 /* 1 次三连 → 不合格 */
 G.reset();
 runCascade(3, 0);
 G.addScore(500);
-eq(G.state.vouchers, 0, '只有 1 次三连 → 不发券');
+eq(G.state.inventory.hammer, 0, '只有 1 次三连 → 不发券');
 
 /* 2 次三连 → 合格 */
 G.reset();
 runCascade(3, 0);
 runCascade(3, 0);
 G.addScore(500);
-eq(G.state.vouchers, 1, '2 次三连 → 发 1 张券');
+eq(G.state.inventory.hammer, 1, '2 次三连 → 发 1 张券');
 
 /* 档位之间不合并：档位 0 攒 2 次双连，档位 1 攒 2 次双连，都不合格 */
 G.reset();
 runCascade(2, 0); runCascade(2, 0);
 G.addScore(500);                       // 结算节点 1：档位 0 只有 2 次 → 不合格
-eq(G.state.vouchers, 0, '档位 0 只 2 次双连 → 节点 1 不发券');
+eq(G.state.inventory.hammer, 0, '档位 0 只 2 次双连 → 节点 1 不发券');
 runCascade(2, 1); runCascade(2, 1);
 G.addScore(500);                       // 结算节点 2：档位 1 只有 2 次 → 不合格
-eq(G.state.vouchers, 0, '两个档位各 2 次也不会合并成合格');
+eq(G.state.inventory.hammer, 0, '两个档位各 2 次也不会合并成合格');
 
 /* ============================================================
  * [D] 档位归属：一条长连锁只算起始档位
  * ========================================================== */
 console.log('\n[D] 档位归属');
+G.setItemRandom(() => 0);        // 恒抽 hammer
 
 G.reset();
 /* 档位 0 里攒够 3 次双连，然后一条长连锁跨过 500 分 */
@@ -269,7 +278,7 @@ runCascade(2, 0); runCascade(2, 0); runCascade(2, 0);
 runCascade(4, 0);
 eq(G.state.bandCombos[0].triple, 1, '长连锁记在起始档位 0 的三连上');
 G.addScore(500);
-eq(G.state.vouchers, 1, '档位 0 合格 → 发券');
+eq(G.state.inventory.hammer, 1, '档位 0 合格 → 发券');
 /* 档位 1 应该没有从这条连锁拿到任何计数 */
 const band1 = G.state.bandCombos[1];
 eq(band1 ? band1.triple : 0, 0, '这条连锁没有把三连复制到档位 1');
@@ -279,15 +288,16 @@ eq(band1 ? band1.double : 0, 0, '这条连锁没有把双连复制到档位 1');
  * [E] 余额上限与 +100 超额
  * ========================================================== */
 console.log('\n[E] 余额上限与超额奖励');
+G.setItemRandom(() => 0);        // 恒抽 hammer
 
 /* 余额 2 时合格 → +100，不发券 */
 G.reset();
-G.state.vouchers = 2;
+G.state.inventory.hammer = 2;
 runCascade(2, 0); runCascade(2, 0); runCascade(2, 0);
 const scoreBefore = G.state.score;
 const progressBefore = G.state.voucherProgress;
 G.addScore(500);
-eq(G.state.vouchers, 2, '余额已满 → 券数不变');
+eq(G.state.inventory.hammer, 2, '余额已满 → 券数不变');
 eq(G.state.score, scoreBefore + 500 + G.VOUCHER_OVERFLOW_SCORE,
    '满额时额外 +' + G.VOUCHER_OVERFLOW_SCORE + ' 分');
 eq(G.state.voucherProgress, progressBefore + 500,
@@ -295,25 +305,25 @@ eq(G.state.voucherProgress, progressBefore + 500,
 
 /* 连续超额：再来一次合格，仍然 +100 */
 G.reset();
-G.state.vouchers = 2;
+G.state.inventory.hammer = 2;
 runCascade(2, 1); runCascade(2, 1); runCascade(2, 1);
 G.addScore(1000);                       // 直接跨到节点 2
-eq(G.state.vouchers, 2, '连续超额仍不发券');
+eq(G.state.inventory.hammer, 2, '连续超额仍不发券');
 ok(G.state.score >= 1000 + G.VOUCHER_OVERFLOW_SCORE, '连续超额仍发 +100，实际得分 ' + G.state.score);
 
 /* +100 不递归：不产生新的待结算节点 */
 G.reset();
-G.state.vouchers = 2;
+G.state.inventory.hammer = 2;
 runCascade(2, 0); runCascade(2, 0); runCascade(2, 0);
 G.addScore(500);
 eq(G.state.pendingMilestones.length, 0, '+100 不会留下新的待结算节点');
 
 /* 余额 1 → 发券到 2 */
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 runCascade(2, 0); runCascade(2, 0); runCascade(2, 0);
 G.addScore(500);
-eq(G.state.vouchers, 2, '余额 1 → 发券后变成 2');
+eq(G.state.inventory.hammer, 2, '余额 1 → 发券后变成 2');
 
 /* ============================================================
  * [F] 既有得分来源都推进券进度
@@ -413,62 +423,62 @@ console.log('\n[I] 锤子模式流程');
 
 /* 无券不能进入 */
 G.reset();
-G.state.vouchers = 0;
+G.state.inventory.hammer = 0;
 eq(G.setHammerMode(true), false, '0 张券 → 无法进入锤子态');
 eq(G.state.hammerMode, false, '状态仍是未进入');
 
 /* 有券可进入，再点一次退出且不消耗 */
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 eq(G.setHammerMode(true), true, '1 张券 → 可以进入');
 eq(G.state.hammerMode, true, '进入锤子态');
 G.toggleHammerMode();
 eq(G.state.hammerMode, false, '再点一次退出');
-eq(G.state.vouchers, 1, '取消不消耗券');
+eq(G.state.inventory.hammer, 1, '取消不消耗券');
 
 /* 点空白：不消耗、不退出 */
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 mkBall(200, 500, 3, { contacts: 1 });
 G.setHammerMode(true);
 eq(G.hammerClickAt(10, 10), false, '点空白返回 false');
-eq(G.state.vouchers, 1, '点空白不消耗券');
+eq(G.state.inventory.hammer, 1, '点空白不消耗券');
 eq(G.state.hammerMode, true, '点空白不退出模式');
 
 /* 点不合格目标：不消耗、不退出 */
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 mkBall(200, 500, 3, { contacts: 1, vx: 300 });
 G.setHammerMode(true);
 eq(G.hammerClickAt(200, 500), false, '点飞行中的水果返回 false');
-eq(G.state.vouchers, 1, '点不合格目标不消耗券');
+eq(G.state.inventory.hammer, 1, '点不合格目标不消耗券');
 eq(G.state.hammerMode, true, '点不合格目标不退出模式');
 
 /* 成功：消耗 1 张、移除 1 只、退出模式 */
 G.reset();
-G.state.vouchers = 2;
+G.state.inventory.hammer = 2;
 const t1 = mkBall(200, 500, 3, { contacts: 1 });
 const before = G.state.balls.length;
 G.setHammerMode(true);
 eq(G.hammerClickAt(200, 500), true, '点合格目标返回 true');
-eq(G.state.vouchers, 1, '成功消耗 1 张券');
+eq(G.state.inventory.hammer, 1, '成功消耗 1 张券');
 eq(G.state.balls.length, before - 1, '成功移除 1 只水果');
 eq(G.state.balls.indexOf(t1), -1, '被砸的那只已从 state.balls 移除');
 eq(G.state.hammerMode, false, '成功后自动退出模式');
 
 /* 重复点击不会双消耗 */
 G.reset();
-G.state.vouchers = 2;
+G.state.inventory.hammer = 2;
 mkBall(200, 500, 3, { contacts: 1 });
 G.setHammerMode(true);
 G.hammerClickAt(200, 500);
-const vAfter = G.state.vouchers;
+const vAfter = G.state.inventory.hammer;
 G.hammerClickAt(200, 500);              // 已退出模式，应无效
-eq(G.state.vouchers, vAfter, '重复点击不会再次消耗');
+eq(G.state.inventory.hammer, vAfter, '重复点击不会再次消耗');
 
 /* 结束时自动取消 */
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 mkBall(200, 500, 3, { contacts: 1 });
 G.setHammerMode(true);
 G.gameOver();
@@ -480,7 +490,7 @@ eq(G.state.hammerMode, false, '游戏结束 → 自动退出锤子态');
 console.log('\n[J] 锤子移除的奖励隔离');
 
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 const victim = mkBall(200, 500, 3, { contacts: 1 });
 const scoreBefore2 = G.state.score;
 const revBefore = G.state.revives;
@@ -496,7 +506,7 @@ eq(victim.removedBy, 'hammer', '移除原因记为 hammer');
 
 /* 砸掉「危险线上方攒够时间」的水果，也不应给救回奖励 */
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 const dang = mkBall(200, 120, 3, { contacts: 1 });
 dang.dangerPeak = 1.0;
 const recBefore2 = G.state.stats.recoveries;
@@ -509,7 +519,7 @@ eq(G.state.stats.recoveries, recBefore2, '锤子移除不调用 creditRecovery')
 console.log('\n[K] 锤子与连锁的交互');
 
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 const chainBall = mkBall(200, 500, 3, { contacts: 1 });
 G.state.cascadeLen = 1;
 G.state.cascadeBall = chainBall;
@@ -537,7 +547,7 @@ eq(b1.removedBy, 'merge', '合成移除标记为 merge（第二颗）');
 console.log('\n[L] 锤子态下的输入隔离');
 
 G.reset();
-G.state.vouchers = 2;
+G.state.inventory.hammer = 2;
 mkBall(200, 500, 3, { contacts: 1 });
 G.setHammerMode(true);
 
@@ -571,7 +581,7 @@ eq(G.state.balls.length, beforeDrop + 1, '退出锤子态后空格投放恢复�
 console.log('\n[M] 瞄准期间物理照常');
 
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 const phys = mkBall(200, 300, 3, { contacts: 1 });
 G.setHammerMode(true);
 const yBefore = phys.y;
@@ -581,7 +591,7 @@ eq(G.state.hammerMode, true, '物理推进不影响锤子态');
 
 /* 判负逻辑照常：越线计时会累积 */
 G.reset();
-G.state.vouchers = 1;
+G.state.inventory.hammer = 1;
 const over = mkBall(200, 120, 3, { contacts: 1 });
 over.overTime = 1.4;
 G.setHammerMode(true);
@@ -599,25 +609,23 @@ eq(G.state.hammerMode, false, '判负后锤子态被自动取消');
 console.log('\n[N] UI 状态');
 
 G.reset();
-G.state.vouchers = 0;
-G.paintVouchers(false);
-eq(els.voucherCount.textContent, '0/2', '计数显示 0/2');
-eq(els.voucherChip.hidden, true, '0 张时胶囊隐藏');
-eq(els.hammerBtn.disabled, true, '0 张时锤子按钮禁用');
+G.state.inventory.hammer = 0;
+G.paintInventory(false);
+eq(els['cnt-hammer'].textContent, '0/2', '计数显示 0/2');
+eq(els['btn-hammer'].disabled, true, '0 个时锤子按钮禁用');
 
-G.state.vouchers = 1;
-G.paintVouchers(false);
-eq(els.voucherCount.textContent, '1/2', '计数显示 1/2');
-eq(els.voucherChip.hidden, false, '有券时胶囊显示');
-eq(els.hammerBtn.disabled, false, '有券时锤子按钮可用');
+G.state.inventory.hammer = 1;
+G.paintInventory(false);
+eq(els['cnt-hammer'].textContent, '1/2', '计数显示 1/2');
+eq(els['btn-hammer'].disabled, false, '有锤子时按钮可用');
 
 G.state.hammerMode = true;
-G.paintVouchers(false);
-eq(els.hammerBtn.getAttribute('aria-pressed'), 'true', '进入锤子态 → aria-pressed=true');
+G.paintInventory(false);
+eq(els['btn-hammer'].getAttribute('aria-pressed'), 'true', '进入锤子态 → aria-pressed=true');
 
 G.state.hammerMode = false;
-G.paintVouchers(false);
-eq(els.hammerBtn.getAttribute('aria-pressed'), 'false', '退出锤子态 → aria-pressed=false');
+G.paintInventory(false);
+eq(els['btn-hammer'].getAttribute('aria-pressed'), 'false', '退出锤子态 → aria-pressed=false');
 
 /* 提示条 */
 G.state.hammerMode = true;
