@@ -846,3 +846,51 @@ real sprites, and the new two-line footer with its three links.
 
 Nothing else from Part II remains. The two open items are environment/deployment facts,
 not defects in the repository.
+
+---
+
+## Archived 2026-10-25 — Pinned version rule aligned (RESOLVED)
+
+**Status: CLOSED.** The Planning Agent updated the pinned section of `PLAN.md` to the
+single-hash rule the owner chose, so the Execution Agent's earlier request is satisfied.
+
+Verified against `PLAN.md` at the time of archiving: the pinned section now states
+`v. Stage X-AAAAAAA` for history entries, `vX-AAAA` for the footer, that only substantive
+commits affect version strings, and that nonfunctional pushes change neither the displayed
+version nor the history list.
+
+Original request (kept for the record):
+
+## Action required by the Planning Agent — pinned version rule is stale
+
+The owner revised the version-number rule after the original plan was written. The rule in
+the pinned section of `PLAN.md` ("Version naming and update history") still describes the
+**old** two-hash format and must be updated by the Planning Agent, because the Execution
+Agent has no write permission on `PLAN.md`.
+
+### Owner decision
+
+Version numbers are determined **only** by substantive commits. The "latest pushed commit"
+hash is no longer part of any version string, anywhere. This removes the structural problem
+where the first hash could never catch up with itself: a commit cannot contain its own hash,
+so `Stage X-AAAAAAA-BBBBBBB` was always one commit behind for `AAAAAAA`.
+
+### New rule now implemented in the project files
+
+| Where | Format | Example |
+|---|---|---|
+| `VERSION_HISTORY.md` entries and current version | `v. Stage X-AAAAAAA` (seven chars) | `v. Stage 3-0fc13ae` |
+| Game page footer | `vX-AAAA` (four chars) | `v3-0fc1` |
+
+- `X` is the major functional Stage; it only increments when a new major Stage begins.
+- `AAAAAAA` is the seven-character hash of the commit that introduced that substantive
+  update.
+- Documentation-only, plan-only, and feedback-only commits never appear in a version string
+  and never change the displayed version.
+
+### What still needs doing
+
+The Planning Agent should replace the "Version naming and update history" bullets in the
+pinned section of `PLAN.md` so they describe the single-hash rule above, including the
+footer's four-character form. The old example referencing `Stage 3-211c57c-7ae3c31` should
+be removed or rewritten, since that two-hash form is no longer used.

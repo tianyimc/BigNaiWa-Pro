@@ -8,7 +8,7 @@ Feedback for the currently active plan. Written by the Execution Agent.
 pre-execution review plus the Stage 1/2/3 execution records and all follow-up refinements;
 everything raised there is closed or accepted except the two items below.
 
-Current active task: Stage 4 — voucher and hammer item (see `PLAN.md`). Implemented in this turn; see the Stage 4 execution note below.
+Current active task: Stage 4 follow-up — hidden grant shortcut and run-score exclusion (see `PLAN.md`). Implemented in this turn; see the follow-up note below.
 
 ---
 
@@ -44,39 +44,98 @@ push is not evidence of deployment. No deployment has been attempted or authoriz
 
 ---
 
-## Action required by the Planning Agent — pinned version rule is stale
+## Stage 4 follow-up execution note — hidden shortcut and run-score exclusion
 
-The owner revised the version-number rule after the original plan was written. The rule in
-the pinned section of `PLAN.md` ("Version naming and update history") still describes the
-**old** two-hash format and must be updated by the Planning Agent, because the Execution
-Agent has no write permission on `PLAN.md`.
+Implemented. This section records the required audit, the implementation, and every
+deviation, using only checks that were actually run.
 
-### Owner decision
+### A. Pre-implementation audit (required by `PLAN.md` step 1)
 
-Version numbers are determined **only** by substantive commits. The "latest pushed commit"
-hash is no longer part of any version string, anywhere. This removes the structural problem
-where the first hash could never catch up with itself: a commit cannot contain its own hash,
-so `Stage X-AAAAAAA-BBBBBBB` was always one commit behind for `AAAAAAA`.
+**Historical-best write sites.** Before this change `state.best` was written from **three**
+places — `addScore()`, `addBonusScore()`, and `payoutOverflow()` — each doing the same
+`state.best` / `localStorage` / `bestEl.textContent` triple. That duplication is why the
+rollback requirement was tractable: all three were collapsed into a single entry point
+(`updateBestIfEligible()`), which now short-circuits when the run is tainted.
 
-### New rule now implemented in the project files
+**Run lifecycle.** `reset()` establishes a new run; `gameOver()` → `askRevive()` → `revive()`
+continues the same run; `settle()` ends it. `revive()` deliberately does **not** call
+`reset()`, so a run-scoped flag survives revival naturally.
 
-| Where | Format | Example |
-|---|---|---|
-| `VERSION_HISTORY.md` entries and current version | `v. Stage X-AAAAAAA` (seven chars) | `v. Stage 3-0fc13ae` |
-| Game page footer | `vX-AAAA` (four chars) | `v3-0fc1` |
+**Leaderboard submission.** The only game→board call is
+`window.DanaiwaBoard.onGameOver(state.score)` inside `settle()`. It is now gated on
+`!state.runTainted`. The board itself remains offline behind `ONLINE_ENABLED = false`.
 
-- `X` is the major functional Stage; it only increments when a new major Stage begins.
-- `AAAAAAA` is the seven-character hash of the commit that introduced that substantive
-  update.
-- Documentation-only, plan-only, and feedback-only commits never appear in a version string
-  and never change the displayed version.
+**Modal/input protection.** `isModalOpen()` already gated `pointermove`, `pointerdown`, and
+the global `keydown`; the new dialog was added to that list.
 
-### What still needs doing
+**Feasibility conclusion.** The existing best-score lifecycle *can* be rolled back safely
+without touching unrelated state: capturing `best` at `reset()` and restoring it when the
+taint is set only ever lowers the value this run contributed, and never below the pre-run
+baseline. No conflict was found, so the plan's "stop and report" branch was not needed.
 
-The Planning Agent should replace the "Version naming and update history" bullets in the
-pinned section of `PLAN.md` so they describe the single-hash rule above, including the
-footer's four-character form. The old example referencing `Stage 3-211c57c-7ae3c31` should
-be removed or rewritten, since that two-hash form is no longer used.
+### B. Implementation points
+
+- `SECRET_PASS = 'hhh'`, `SECRET_CLICKS = 7`, `SECRET_WINDOW = 2000`,
+  `SECRET_VOUCHERS = VOUCHER_MAX`, `SECRET_REVIVES = 2`.
+- `registerTitleClick()` counts clicks with a rolling window; `openSecretDialog()` /
+  `closeSecretDialog()` / `submitSecret()` handle the dialog with focus save/restore.
+- `applySecretGrant(pass)` validates, rejects when `state.over`, then atomically calls
+  `taintRun()` before filling vouchers and adding revive coins.
+- `taintRun()` sets `runTainted` and, **only if** `state.best > state.bestBaseline`,
+  restores `state.best` from the baseline and rewrites `localStorage` + DOM.
+- `updateBestIfEligible()` is the single historical-best writer and returns early when
+  tainted; live score and the run summary keep updating normally.
+- `paintRunTainted()` toggles `#taintNote` on the settlement panel.
+- The dialog was added to `isModalOpen()`, and `keydown` handles it **before** `isTyping()`
+  so typing in the passphrase field cannot leak Space/Enter into a fruit drop.
+
+### C. Deviations and judgement calls
+
+1. **`keydown` ordering changed.** The secret-dialog branch must run before the
+   `isTyping()` early return, otherwise pressing Space inside the password field would fall
+   through to the game. The dialog branch now consumes every key except Escape.
+2. **Grant feedback float downsized.** The first version used the 40 px "big" float style
+   for both lines; in the browser it covered most of the board and obscured the settlement
+   panel behind it. Both lines now use the 26 px `chain` style with a shorter life.
+3. **Narrow-screen HUD rework (side effect).** With a third and fourth action button, two
+   three-digit score cards no longer fit at 320 px; the score values were being clipped.
+   Buttons were compacted to 30 px icon buttons and the score cards tightened so both
+   three-digit values render fully. This is a layout fix, not a new feature.
+4. **`stage3.test.js` assertion relaxed.** The heading gained `id="gameTitle"`, so the exact
+   `<h1>…</h1>` match was widened to `<h1[^>]*>…</h1>`.
+5. **No separate "run ended" bookkeeping was added.** The plan's requirement that the taint
+   clears only on a genuinely new run is satisfied by `reset()` alone, because `revive()`
+   never resets state.
+
+### D. Verification actually performed
+
+| Command / check | Result |
+|---|---|
+| `node physics.test.js` | PASS |
+| `node gameplay.test.js` | 48 / 0 |
+| `node name-filter.test.js` | 33 / 0 |
+| `node stage2.test.js` | 118 / 0 |
+| `node stage3.test.js` | 114 / 0 |
+| `node stage4.test.js` | 108 / 0 |
+| `node stage4-followup.test.js` (new) | **80 / 0** |
+| Browser 1280×900 / 320×568 / 390×844 | 7 title clicks open the dialog, input auto-focused, `scrollWidth == innerWidth` |
+| Browser: correct passphrase | `runTainted` true, vouchers 0→2, revives +2, dialog closed |
+| Browser: best rollback | best 900 → 500 restored, live score stays 900 |
+| Browser: settlement panel | taint note visible with the exclusion wording; `finalScore` 900, `finalBest` 500 |
+| Browser: page/console errors | none |
+| Browser: external network requests | **0** |
+
+### E. Version
+
+Footer is `v4-997b`; `VERSION_HISTORY.md` gained `v. Stage 4-997b334` at the top and the
+current-version block points at the same commit. Stage stayed **4** because the plan
+classifies this as a follow-up, not a new Stage. Version synced in a follow-up commit, since
+a commit cannot contain its own hash.
+
+### F. Standing note on the passphrase
+
+`hhh` lives in the public `game.js`. Anyone can read it, and it must not be described as
+secure or tamper-proof. It is a convenience gate only, exactly as the plan states.
 
 ## Stage 4 execution note — voucher and hammer
 
