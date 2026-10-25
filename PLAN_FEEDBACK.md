@@ -8,7 +8,7 @@ Feedback for the currently active plan. Written by the Execution Agent.
 pre-execution review plus the Stage 1/2/3 execution records and all follow-up refinements;
 everything raised there is closed or accepted except the two items below.
 
-Current active task: create `VERSION_HISTORY.md` (see `PLAN.md`); version-number rule was subsequently revised by the owner — see the note below.
+Current active task: Stage 4 — voucher and hammer item (see `PLAN.md`). Implemented in this turn; see the Stage 4 execution note below.
 
 ---
 
@@ -77,6 +77,94 @@ The Planning Agent should replace the "Version naming and update history" bullet
 pinned section of `PLAN.md` so they describe the single-hash rule above, including the
 footer's four-character form. The old example referencing `Stage 3-211c57c-7ae3c31` should
 be removed or rewritten, since that two-hash form is no longer used.
+
+## Stage 4 execution note — voucher and hammer
+
+Stage 4 is implemented. This section records the required pre-implementation audit, the
+implementation points, and every deviation from the literal plan text.
+
+### A. Pre-implementation audit (required by `PLAN.md`)
+
+**Score-writing paths.** Four exist, and all now advance voucher progress:
+
+| Path | Function | Revive coins | Voucher progress |
+|---|---|---|---|
+| Ordinary merge | `addScore()` | yes (1,500 threshold) | yes |
+| Top-tier +500 clear | `addScore()` | yes, plus its own extra coin | yes |
+| Cascade bonus | `addBonusScore()` | no | yes |
+| Danger recovery +30 | `addBonusScore()` | no | yes |
+
+Only the new over-cap +100 payout bypasses progress; it writes score/best directly.
+
+**Cascade lifecycle.** `noteCascadeMerge()` starts or extends a chain; `settleCascade()` is
+called on the 600 ms timeout, on a player drop, when a new chain supersedes the old one, and
+on a top-tier clear. Length is only known at settlement, which is why milestone settlement is
+deferred while a chain is open.
+
+**Ball creation/removal and input.** `state.balls` is only appended by `makeBall()` callers
+(drop, merge) and previously only shrunk by the `dead` filter in `processMerges()`. Render
+order in `drawBalls()` is `sort((a,b) => a.r - b.r)`, so **larger fruit is drawn later and
+therefore sits on top**. Input paths that could drop a fruit were `pointerdown` (mouse),
+`pointerup` (touch), and the Space/Enter/ArrowDown branch of `keydown`; all three are now
+gated by hammer mode.
+
+### B. Implementation points
+
+- `voucherProgress` is a separate monotonic counter; `state.score` and the revive ledger are
+  untouched.
+- `bandCombos[]` holds per-band `{double, triple, closed}`; a closed band is never reopened.
+- `pendingMilestones[]` queues crossed nodes in ascending order and is drained only when no
+  cascade is open, so one long chain cannot qualify multiple bands.
+- `noteCascadeMerge(nb, startBand)` receives the band captured **before** `addScore()` in
+  `processMerges()`.
+- `removeBall(b, cause)` marks `dead`, sets `removedBy`, splices synchronously, clears danger
+  timers, and settles the chain if the removed ball was its current link.
+- `isHammerTarget()` requires live membership, `landed`, `contacts > 0`, and speed ≤ 55 px/s.
+- `pickHammerTarget()` walks the render order backwards so the visually topmost fruit wins.
+
+### C. Deviations and judgement calls
+
+1. **Render-order correction.** My first implementation assumed the smaller fruit was drawn
+   on top and selected the largest on overlap, which the Stage 4 test caught as a failure.
+   The test was right: `drawBalls()` sorts ascending and paints in that order, so the
+   **largest** fruit is on top. Implementation and test were both corrected, and the comment
+   now states the real ordering.
+2. **`ensureBand()` gained defensive defaults.** The stricter cascade rule
+   (`removedBy === 'merge'`) meant older Stage 2 tests that simulate merges by setting
+   `dead = true` now need `removedBy = 'merge'`. Rather than only patching the tests,
+   `ensureBand()` and `noteCascadeMerge()` now fall back to the current band when
+   `startBand` is missing or invalid, so an external caller cannot crash the game.
+3. **`stage2.test.js` was edited.** Five places that hand-simulate a merge now also set
+   `removedBy = 'merge'`. This is a test-fixture correction forced by the new, stricter
+   contract — not a behaviour change.
+4. **Narrow-screen action bar.** Four action buttons no longer fit beside the score cards.
+   The narrow layout now renders all four as icon-only buttons. The panel still keeps the
+   full label on desktop.
+5. **`.actions` grid changed to three columns** on desktop so hammer/audio/restart share a
+   row while the leaderboard button keeps its own full-width row.
+
+### D. Verification actually performed
+
+| Check | Result |
+|---|---|
+| `node physics.test.js` | PASS |
+| `node gameplay.test.js` | 48 / 0 |
+| `node name-filter.test.js` | 33 / 0 |
+| `node stage2.test.js` | 118 / 0 |
+| `node stage3.test.js` | 114 / 0 |
+| `node stage4.test.js` (new) | **108 / 0** |
+| Browser 1280×900 / 320×568 / 390×844 | no page errors, no console errors, 11/11 sprites, no horizontal overflow |
+| External network requests | 0 |
+| Live play then hammer | 6 resting fruits eligible; click removed 1, consumed 1 voucher, score unchanged, mode auto-exited |
+| Voucher progress during live play | advanced 0 → 154 with real merges; band recorded 2 doubles |
+| Hammer mode input isolation | Space did not drop; Escape exited |
+
+### E. Version
+
+Page footer is `v4-4f88`; `VERSION_HISTORY.md` gained
+`v. Stage 4-4f88949` at the top of the (newest-first) list, and the current-version block
+points at the same commit. Per the pinned rule, the version was synced in a follow-up
+commit because a commit cannot contain its own hash.
 
 ## Notes on the current task — version history
 
