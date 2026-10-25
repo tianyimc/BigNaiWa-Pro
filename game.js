@@ -1127,15 +1127,21 @@
     /* 原子操作：先作废本局，再补资源 */
     taintRun();
 
-    /* 隐藏发放只补锤子，不碰其它道具库存 */
-    state.inventory.hammer = SECRET_HAMMERS;
+    /* 隐藏发放：把四种道具都补到各自上限。
+       注意护盾是一次性的：如果本局已经用过，就不再补（否则等于破坏一次性规则）。
+       owner 明确要求「全都补上」，这里按 owner 指令执行，
+       与 PLAN 原文「只补锤子」的差异已记入 PLAN_FEEDBACK.md。 */
+    state.inventory.hammer = ITEM_MAX.hammer;
+    state.inventory.magnet = ITEM_MAX.magnet;
+    state.inventory.fan = ITEM_MAX.fan;
+    if (!state.shieldUsedThisRun) state.inventory.shield = ITEM_MAX.shield;
     state.revives += SECRET_REVIVES;              // 送 2 枚复活币
-    paintVouchers(true);
+    paintInventory(true);
     paintRevives(true);
 
     /* 用中等字号（chain 档）而不是 40px 大字：两条 40px 叠在棋盘中央
        会盖住大半个屏幕，尤其判负时还会压住结算面板。 */
-    state.floats.push({ x: W / 2, y: 200, text: '已补满道具券', life: 1.1, chain: true });
+    state.floats.push({ x: W / 2, y: 200, text: '道具已补满', life: 1.1, chain: true });
     state.floats.push({ x: W / 2, y: 248, text: '+2 复活币', life: 1.1, chain: true });
     Sound.bonus();
     return true;

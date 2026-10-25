@@ -142,7 +142,30 @@ branch was not needed.
 | Browser: page/console errors | none |
 | Browser: external network requests | **0** |
 
-### E. Version
+### E. Owner-directed deviation — hidden grant now fills all four items
+
+`PLAN.md` §B states the hidden grant "fills the hammer count to its existing maximum of 2
+and adds 2 revive coins; it must not fill or alter the other item inventories."
+
+**The owner has since directed that the grant fill every item.** Implemented as instructed:
+
+- `hammer` → 2, `magnet` → 2, `fan` → 2, `shield` → 1 (each to `ITEM_MAX`).
+- `shield` is still skipped when `shieldUsedThisRun` is true, because filling it would break
+  the one-use-per-run rule that §B and §F both establish. This is the smallest reading that
+  satisfies "fill them all" without contradicting the shield contract.
+- Revive coins remain +2; the run still becomes tainted and excluded from records.
+
+The grant float changed from 「已补满道具券」 to 「道具已补满」 to match the broader effect.
+
+Tests updated in `stage4-phase2.test.js` section [D]: the three "does not touch
+magnet/fan/shield" assertions were replaced with "fills to cap" assertions, plus new cases
+for partial holdings and for the shield-already-used case. `stage4-phase2` is now
+**157 / 0** (was 149).
+
+This is a deliberate, owner-authorized divergence from the plan text, not an oversight. If
+the plan is re-issued, §B's hidden-grant paragraph should be updated to match.
+
+### F. Version
 
 Footer is `v4-2a6a`; `VERSION_HISTORY.md` gained `v. Stage 4-2a6a1eb` at the top of the
 newest-first list and the current-version block points at the same commit. Stage stayed **4**.

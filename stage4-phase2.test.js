@@ -6,7 +6,7 @@
  *    · 四种道具的强制抽签结果、均匀抽样契约、不重抽
  *    · 满额/不可用 → 恰好一次 +100，无递归里程碑、无二次奖励
  *    · 每种道具的上限边界（下/等于/超过）、护盾一次性、
- *      新局重置、复活保留、隐藏发放只补锤子
+ *      新局重置、复活保留、隐藏发放补满全部道具
  *    · 锤子回归：资格、取消、恰好一次消耗、奖励隔离、连锁移除
  *    · 磁铁：选择目标、无邻居失败不扣、局部目标重算、力/时长上限、
  *      目标被移除、不叠加、不瞬移、不直接给奖励
@@ -273,9 +273,10 @@ eq(G.state.inventory.shield, 1, '复活后护盾库存保留');
 eq(G.state.shieldUsedThisRun, true, '复活后护盾已用标记保留');
 
 /* ============================================================
- * [D] 隐藏发放只补锤子
+ * [D] 隐藏发放补满全部道具
+ *     （owner 指令：从「只补锤子」改为「全都补上」）
  * ========================================================== */
-console.log('\n[D] 隐藏发放只补锤子');
+console.log('\n[D] 隐藏发放补满全部道具');
 
 G.reset();
 G.state.inventory.hammer = 0;
@@ -285,10 +286,32 @@ G.state.inventory.shield = 0;
 G.state.revives = 0;
 G.applySecretGrant(G.SECRET_PASS);
 eq(G.state.inventory.hammer, 2, '隐藏发放把锤子补到 2');
-eq(G.state.inventory.magnet, 0, '隐藏发放不动磁铁');
-eq(G.state.inventory.fan, 0, '隐藏发放不动风扇');
-eq(G.state.inventory.shield, 0, '隐藏发放不动护盾');
+eq(G.state.inventory.magnet, 2, '隐藏发放把磁铁补到 2');
+eq(G.state.inventory.fan, 2, '隐藏发放把风扇补到 2');
+eq(G.state.inventory.shield, 1, '隐藏发放把护盾补到 1');
 eq(G.state.revives, 2, '隐藏发放仍然 +2 复活币');
+
+/* 部分持有 → 补齐到上限 */
+G.reset();
+G.state.inventory.hammer = 1;
+G.state.inventory.magnet = 1;
+G.state.inventory.fan = 0;
+G.state.inventory.shield = 0;
+G.applySecretGrant(G.SECRET_PASS);
+eq(G.state.inventory.hammer, 2, '锤子 1 → 补到 2');
+eq(G.state.inventory.magnet, 2, '磁铁 1 → 补到 2');
+eq(G.state.inventory.fan, 2, '风扇 0 → 补到 2');
+eq(G.state.inventory.shield, 1, '护盾 0 → 补到 1');
+
+/* 护盾是一次性的：本局已用掉时不再补，避免破坏一次性规则 */
+G.reset();
+G.state.shieldUsedThisRun = true;
+G.state.inventory.shield = 0;
+G.applySecretGrant(G.SECRET_PASS);
+eq(G.state.inventory.shield, 0, '护盾本局已用 → 不再补');
+eq(G.state.inventory.hammer, 2, '其它道具照常补满');
+eq(G.state.inventory.magnet, 2, '磁铁照常补满');
+eq(G.state.inventory.fan, 2, '风扇照常补满');
 
 /* 已有 1 个锤子时也补到 2 */
 G.reset();
