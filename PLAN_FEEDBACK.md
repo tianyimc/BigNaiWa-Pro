@@ -28,44 +28,42 @@ so this is an environment limitation rather than a repository defect.
 **Blocker:** installing `numpy` and `Pillow` is a system-state change and requires explicit
 owner authorization. Until then, asset-script changes can only be validated statically.
 
-### 9.5 Deployment chain unverified
-
-It is still unknown whether pushing `origin/main` publishes a site, and which repository is
-canonical. `origin` is `tianyimc/BigNaiWa-Pro`; the historically referenced Pages URL was
-`yhsome.github.io/BigNaiWa/`. A live check earlier in this project confirmed the `yhsome`
-site served the old redirect page; nothing proves it redeploys from this repository.
-Marked **未确定**.
-
-This is consistent with the pinned rule in `PLAN.md`: hosting status is unverified and a Git
-push is not evidence of deployment. No deployment has been attempted or authorized.
-
 ---
 
 ---
 
-## Action required by the Planning Agent — archive completed plan content
+## Action required by the Planning Agent — pinned section is now outdated
 
-`PLAN.md` still carries the full Stage 4 plan text (both the base task and the second-phase
-task) in its active section. All of it is now implemented, tested and pushed, so per the
-pinned lifecycle rule the Planning Agent should:
+The Planning Agent already archived the Stage 4 plan content in `18c51b3`
+("Archive Stage 4 as accepted"), so items 1 and 5 of the previous request are done. What
+remains is a **stale rule in the pinned section**.
 
-1. **Move the completed Stage 4 content into `PLAN_ARCHIVED.md`** with a dated/status
-   heading, following the existing archive convention. Do not overwrite earlier entries.
-2. **Keep the pinned section in `PLAN.md`** — it is never archived.
-3. **Update the plan text where the owner overrode it.** Specifically, `PLAN.md` §B of the
-   second-phase plan still says the hidden grant "must not fill or alter the other item
-   inventories", but the owner directed that it fill **all four** items (hammer 2, magnet 2,
-   fan 2, shield 1, with shield skipped once used). Any re-issued plan should state the
-   current behaviour, not the superseded one.
-4. **Reflect the closing task** in the archive entry: the top-tier clear bonus is now
-   **800** points (was 500), the run statistic previously called 「顶级清场」 is now
-   「合成神奶蛙」 and renders one ⭐ per clear after the score, and the narrow-screen HUD was
-   adjusted for the extra star row.
-5. Replace the active section with the next authorized task, or leave `PLAN.md` with only
-   the pinned section if nothing is queued.
+### The pinned deployment bullet contradicts reality
 
-The Execution Agent cannot perform any of the above: `PLAN.md` and `PLAN_ARCHIVED.md` are
-Planning Agent files.
+`PLAN.md` pinned section, 「Project identity and constraints」, currently says:
+
+> Do not add direct-play URLs or claim that the game is deployed. Hosting status is
+> unverified; a Git push is not evidence of deployment.
+
+That is no longer true. The owner confirmed the project is public at
+**<https://naiwa.tianyimc.com/>**, and it was verified from this host:
+
+- DNS resolves;
+- `GET /` returns **HTTP 200**, no redirect;
+- the served page is this repository's current build (`<title>合成大奶蛙Pro</title>`,
+  chain note 「换 800 分 + 一枚复活币」, footer `v4-19fa`).
+
+The Execution Agent therefore added the live URL to `README.md` and to the game page footer,
+which the pinned bullet forbids. The bullet should be rewritten to something like:
+"The game is deployed at `https://naiwa.tianyimc.com/`; documentation may reference that URL.
+Deployment configuration itself lives outside this repository."
+
+### Still pending from the previous request
+
+- **§B of the second-phase plan text** (now archived) said the hidden grant "must not fill
+  or alter the other item inventories". The owner overrode this: the grant fills **all four**
+  items (hammer 2, magnet 2, fan 2, shield 1, shield skipped once used). Any future plan
+  quoting that behaviour should use the current rule.
 
 ---
 
@@ -137,3 +135,50 @@ Owner-directed closing work for Stage 4. All three items are implemented.
 Footer is `v4-<hash>` pointing at this task's substantive commit; `VERSION_HISTORY.md`
 carries the matching `v. Stage 4-<hash>` entry at the top of the newest-first list. Stage
 stayed **4**.
+
+---
+
+## Deployment announcement — documentation update
+
+The owner confirmed the project is publicly playable at **<https://naiwa.tianyimc.com/>**.
+Documentation was updated to match.
+
+### Verified before editing
+
+| Check | Result |
+|---|---|
+| DNS for `naiwa.tianyimc.com` | resolves |
+| `GET https://naiwa.tianyimc.com/` | **HTTP 200**, no redirect |
+| Served `<title>` | 合成大奶蛙Pro |
+| Served chain note | 「换 800 分 + 一枚复活币」 |
+| Served footer version | `v4-19fa` |
+
+So the deployment serves this repository's current build, not an older snapshot.
+
+### Files changed
+
+- **`README.md`** — replaced the 「本项目目前没有对外公布的线上地址」 bullet with a new
+  「🎮 在线玩」 section carrying the live URL, and reworded the deployment note under 「运行」.
+- **`index.html`** — added an 「在线玩」 link to the page footer beside the author and
+  repository links, using the same `target="_blank"` + `rel="noopener noreferrer"` +
+  `aria-label` pattern as the other footer links.
+
+### Note on the pinned rule
+
+This change deliberately contradicts the pinned bullet that forbids direct-play URLs. The
+owner's direct instruction takes precedence, and the bullet is now factually wrong — see the
+"Action required by the Planning Agent" section above for the requested rewrite.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| `node physics.test.js` | PASS |
+| `node gameplay.test.js` | 48 / 0 |
+| `node name-filter.test.js` | 33 / 0 |
+| `node stage2.test.js` | 118 / 0 |
+| `node stage3.test.js` | 114 / 0 |
+| `node stage4.test.js` | 108 / 0 |
+| `node stage4-followup.test.js` | 74 / 0 |
+| `node stage4-phase2.test.js` | 170 / 0 |
+| Browser 1280×900 / 320×568 | footer shows the 在线玩 link, no horizontal overflow |

@@ -1221,3 +1221,44 @@ the plan is re-issued, §B's hidden-grant paragraph should be updated to match.
 Footer is `v4-2a6a`; `VERSION_HISTORY.md` gained `v. Stage 4-2a6a1eb` at the top of the
 newest-first list and the current-version block points at the same commit. Stage stayed **4**.
 Version synced in a follow-up commit because a commit cannot contain its own hash.
+
+---
+
+## Archived 2026-10-25 — Deployment confirmed live — CLOSED
+
+**Status: CLOSED.** The project is now publicly deployed and reachable. Item 9.5
+("deployment chain unverified") is resolved.
+
+### Verified facts
+
+- Public URL: **<https://naiwa.tianyimc.com/>**
+- DNS resolves; `GET /` returns **HTTP 200** with no redirect.
+- The served page is this repository's current build: `<title>合成大奶蛙Pro</title>`,
+  chain note reading 「换 800 分 + 一枚复活币」, footer version `v4-19fa`.
+- So the deployment serves the same content as `origin/main` at the time of checking.
+
+### What changed in the repository
+
+- `README.md` gained a 「🎮 在线玩」 section at the top with the live URL, and the previous
+  statements that no online address existed were removed.
+- The game page was left unchanged: an 「在线玩」 footer link was tried and then removed at
+  the owner's direction, so the live URL appears in the README only.
+
+### Note on the pinned rule
+
+The pinned section of `PLAN.md` still says "Do not add direct-play URLs or claim that the
+game is deployed. Hosting status is unverified". That rule is now **outdated** — the owner
+has confirmed and verified the deployment. The Planning Agent should update that bullet.
+
+### Original item text (kept for the record)
+
+### 9.5 Deployment chain unverified
+
+It is still unknown whether pushing `origin/main` publishes a site, and which repository is
+canonical. `origin` is `tianyimc/BigNaiWa-Pro`; the historically referenced Pages URL was
+`yhsome.github.io/BigNaiWa/`. A live check earlier in this project confirmed the `yhsome`
+site served the old redirect page; nothing proves it redeploys from this repository.
+Marked **未确定**.
+
+This is consistent with the pinned rule in `PLAN.md`: hosting status is unverified and a Git
+push is not evidence of deployment. No deployment has been attempted or authorized.
