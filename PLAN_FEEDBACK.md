@@ -8,7 +8,7 @@ Feedback for the currently active plan. Written by the Execution Agent.
 pre-execution review plus the Stage 1/2/3 execution records and all follow-up refinements;
 everything raised there is closed or accepted except the two items below.
 
-Current active task: Stage 4 follow-up — hidden grant shortcut and run-score exclusion (see `PLAN.md`). Implemented in this turn; see the follow-up note below.
+Current active task: Stage 4 second phase — item inventory, magnet, fan, bubble shield (see `PLAN.md`). Implemented in this turn; see the phase-2 note below.
 
 ---
 
@@ -43,6 +43,110 @@ This is consistent with the pinned rule in `PLAN.md`: hosting status is unverifi
 push is not evidence of deployment. No deployment has been attempted or authorized.
 
 ---
+
+## Stage 4 second phase execution note — inventory, magnet, fan, shield
+
+Implemented. Stage number stayed **4** as the plan requires. This section records the
+required audit, the implementation points, and every deviation.
+
+### A. Audit before implementation (required by `PLAN.md` §A)
+
+**Milestone path.** `advanceVoucherProgress()` queues crossed 500-point nodes;
+`trySettleMilestones()` drains them only when no cascade is open; `settleMilestone()` closes
+each band exactly once and decides qualification from `band.double >= 3 || band.triple >= 2`.
+The award branch was the only place that needed changing, so the queuing/attribution logic
+was left untouched.
+
+**Score paths.** Four: `addScore()` (ordinary merge, top-tier +500), `addBonusScore()`
+(cascade bonus, danger recovery), and the direct writes inside `payoutOverflow()`. All
+still advance `voucherProgress` except the compensation payout, which is excluded by design.
+
+**Physics integration order.** `stepPhysics(dt)` runs integrate → constraint solve → elastic
+impulse → merge processing. Item forces must therefore be applied **before** the integrate
+loop as accelerations; anything that repositions fruit directly would bypass collision
+resolution. Both new forces were inserted immediately before integration.
+
+**Danger clock.** `checkGameOver(dt)` accumulates per-fruit `overTime` only when speed is
+below `REST_SPEED` (140 px/s), decays at 2× otherwise, and ends the run when a single fruit
+exceeds `OVER_LIMIT` (1.5 s). It is not a global countdown — which is exactly why the shield
+had to pause each fruit's own counter rather than a shared timer.
+
+**Frame throttling.** `frame()` caps `dt` at 0.25 s and allows at most 5 catch-up steps, so a
+backgrounded tab produces a large `dt` on return. The shield therefore uses
+`performance.now()` (monotonic) rather than accumulated `dt`, and expiry is processed at the
+top of `update()` before any danger evaluation.
+
+**Reset vs revive.** `reset()` clears run state; `revive()` does not call `reset()`, so
+run-scoped inventory and the shield-used flag survive revival for free.
+
+No conflict was found with the plan's ordering requirements, so the "stop and report"
+branch was not needed.
+
+### B. Implementation points
+
+- `ITEM_TYPES` / `ITEM_MAX` / `ITEM_LABEL` centralize the four types and their caps (2/2/2/1).
+- `state.inventory` replaces the shared count; `state.shieldUsedThisRun` is the one-use ledger.
+- `drawItemType()` / `awardRandomItem()` draw **before** checking availability and never
+  reroll; `payoutOverflow()` is the single compensation path.
+- `setItemRandom(fn)` injects the random source for deterministic tests.
+- `applyMagnetForce(dt)` / `applyFanForce(dt)` are called at the top of `stepPhysics()`,
+  before integration, and are bounded by `MAGNET_MAX_SPEED` / `FAN_MAX_ADDED_VX`.
+- `magnetLocalTarget()` recomputes the neighbourhood centroid every substep.
+- `activateShield(source)` is the single entry for manual and automatic activation;
+  `updateShield()` handles expiry with `nowMs()`; `maybeAutoShield()` runs immediately before
+  `checkGameOver()`.
+- `checkGameOver()` returns early while the shield is active, leaving every `overTime` and
+  `dangerPeak` untouched, and still reports the visual danger state truthfully.
+
+### C. Deviations and judgement calls
+
+1. **`paintVouchers()` was kept as a thin alias.** Old call sites and tests still reference
+   it; it now forwards to `paintInventory(pop, 'hammer')`. Removing it outright would have
+   churned unrelated code for no benefit.
+2. **`state.vouchers` is retained but unused.** Kept as a zeroed compatibility field so that
+   stale references cannot throw; it is reset on every new run and is not read by gameplay.
+3. **The item UI became an expandable menu.** With four items plus audio/restart/leaderboard,
+   the action bar no longer fit at 320 px — score cards were being clipped. Per the owner's
+   direction the four items now live behind one 🎒 button that opens a floating panel.
+4. **The menu is re-parented to `<body>`.** `.panel` carries `backdrop-filter`, which creates
+   a containing block that breaks `position: fixed`, and `.stage` has `overflow: hidden`.
+   Moving the panel to `body` and positioning it in viewport coordinates avoids both. This
+   cost three iterations to get right; the measured result is in the verification table.
+5. **Narrow-screen top bar wraps.** `--topbar` was raised from 68 px to 104 px so the
+   two-row top bar does not squeeze the board.
+6. **Shield auto-trigger scans for the minimum remainder.** The plan says "the minimum
+   remaining time is at most 0.5 s"; the implementation computes that minimum across all
+   eligible fruits rather than checking them in array order, so multiple fruits with
+   different timers behave correctly.
+7. **`stage4.test.js` and `stage4-followup.test.js` were migrated** to the inventory API
+   (`inventory.hammer`, `cnt-*` / `btn-*` element ids, forced random draws for milestone
+   assertions). This is test-fixture migration required by the plan's own §C, not a
+   behaviour change.
+
+### D. Verification actually performed
+
+| Command / check | Result |
+|---|---|
+| `node physics.test.js` | PASS |
+| `node gameplay.test.js` | 48 / 0 |
+| `node name-filter.test.js` | 33 / 0 |
+| `node stage2.test.js` | 118 / 0 |
+| `node stage3.test.js` | 114 / 0 |
+| `node stage4.test.js` | 108 / 0 |
+| `node stage4-followup.test.js` | 74 / 0 |
+| `node stage4-phase2.test.js` (new) | **146 / 0** |
+| Browser 1280×900 | menu opens above the button, all four rows with counts, `scrollWidth == 1280` |
+| Browser 320×568 | menu fully visible, `scrollWidth == 320`, no clipping |
+| Browser 390×844 | menu fully visible, `scrollWidth == 390` |
+| Browser: shield active | countdown reads `🫧 护盾 4.9s`, shield button disabled |
+| Browser: page/console errors | none |
+| Browser: external network requests | **0** |
+
+### E. Version
+
+Footer is `v4-2a6a`; `VERSION_HISTORY.md` gained `v. Stage 4-2a6a1eb` at the top of the
+newest-first list and the current-version block points at the same commit. Stage stayed **4**.
+Version synced in a follow-up commit because a commit cannot contain its own hash.
 
 ## Stage 4 follow-up execution note — hidden shortcut and run-score exclusion
 
