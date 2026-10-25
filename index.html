@@ -32,6 +32,14 @@
       <span class="revive-chip-ico" aria-hidden="true">🪙</span><span id="reviveCount">×0</span>
     </div>
 
+    <!-- 道具券计数：有券才显示，紧贴复活币胶囊下方 -->
+    <div class="voucher-chip" id="voucherChip" hidden>
+      <span class="voucher-chip-ico" aria-hidden="true">🎟️</span><span id="voucherCount">0/2</span>
+    </div>
+
+    <!-- 锤子瞄准态的操作提示 -->
+    <div class="hammer-hint" id="hammerHint" hidden></div>
+
     <div class="overlay" id="overlay">
       <div class="dialog">
 
@@ -139,6 +147,10 @@
     <div class="actions">
       <button class="btn btn-wide" id="boardBtn" type="button">
         <span class="ico">🏆</span><span class="lbl">排行榜</span>
+      </button>
+      <button class="btn btn-hammer" id="hammerBtn" type="button"
+              aria-pressed="false" title="锤子：消耗 1 张道具券，砸掉一只静止的奶蛙" disabled>
+        <span class="ico">🔨</span><span class="lbl">锤子</span>
       </button>
       <button class="btn" id="soundBtn" type="button" aria-pressed="true">
         <span class="ico">🔊</span><span class="lbl">音效开</span>

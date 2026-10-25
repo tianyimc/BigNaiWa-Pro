@@ -60,6 +60,17 @@
   const FINESSE_KEY_STEP = 20;     // 键盘每按一次加减多少
   const FINESSE_TOUCH_WINDOW = 120; // ms：用拖动最后这段时间的横向速度
 
+  /* —— Stage 4：道具券 + 锤子 ——
+     道具券按「每 500 分一个档位」结算：某个档位累计到 3 次双连或 2 次三连，
+     该档位的里程碑就发一张券。券最多 2 张，满了就改发 +100 分（不推进券进度）。 */
+  const VOUCHER_STEP = 500;        // 每个档位多少分
+  const VOUCHER_MAX = 2;           // 券的持有上限
+  const VOUCHER_OVERFLOW_SCORE = 100; // 满额时改为加多少分
+  const COMBO_DOUBLE_NEED = 3;     // 一个档位里要几次双连
+  const COMBO_TRIPLE_NEED = 2;     // 或要几次三连
+  const HAMMER_REST_SPEED = 55;    // 锤子只能砸「基本停住」的水果（px/s）
+  const HAMMER_REST_SPEED2 = HAMMER_REST_SPEED * HAMMER_REST_SPEED;
+
   /* —— Q 弹手感 —— */
   const RESTITUTION      = 0.38;  // 球与球之间的弹性
   const WALL_RESTITUTION = 0.45;  // 撞墙 / 撞地面的弹性
@@ -274,6 +285,26 @@
     cascadeTime: 0,
     cascadeX: 0,
     cascadeY: 0,
+    cascadeStartBand: 0,   // 这条连锁开链时所在的券档位
+
+    /* —— 道具券（每局重置；复活不重置）——
+       vouchers        当前持有几张券（上限 VOUCHER_MAX）
+       voucherProgress 券进度分：单调递增，只有「实质得分」才推进它。
+                       满额时的 +100 不加进来，避免靠溢出奖励刷券。
+       voucherMilestone 已经结算到第几个 500 分节点（0 表示还没结算过）
+       bandCombos      每个档位的连击记录 { double, triple }
+       pendingMilestones 等待结算的里程碑节点（升序），连锁未结束时会先攒着 */
+    vouchers: 0,
+    voucherProgress: 0,
+    voucherMilestone: 0,
+    bandCombos: [],
+    pendingMilestones: [],
+
+    /* —— 锤子 ——
+       hammerMode 是否处于「选目标」状态
+       hammerHover 当前鼠标/手指悬停命中的可砸水果（用于高亮） */
+    hammerMode: false,
+    hammerHover: null,
 
     /* —— 局内统计（每局重置，只由玩法事件驱动）—— */
     stats: {
@@ -446,8 +477,8 @@
           if (minGap > MERGE_PAD || minGap === 1e9) continue;
 
           if (a.tier === b.tier && it === 0) {
-            a.dead = true;
-            b.dead = true;
+            a.dead = true;  a.removedBy = 'merge';
+            b.dead = true;  b.removedBy = 'merge';
             merges.push([a, b]);
             continue;
           }
@@ -614,6 +645,10 @@
         nb.popAt = performance.now();
         state.balls.push(nb);
 
+        /* 起始档位必须在加分之前取：这条连锁归属哪个 500 分档位，
+           看的是「本次合成得分入账前」的券进度。 */
+        const startBand = bandOf(state.voucherProgress);
+
         addScore(MERGE_SCORE[nt], mx, my, '+' + MERGE_SCORE[nt]);
         burst(mx, my, nt, 8 + nt * 2, 140 + nt * 22);
         Sound.merge(nt);
@@ -621,7 +656,7 @@
         if (nt === MAX_TIER) state.flash = 1;
 
         noteTier(nt);        // 最高等级统计（含投放起始等级）
-        noteCascadeMerge(nb); // 连锁判定
+        noteCascadeMerge(nb, startBand); // 连锁判定
         unlockTier(nt);       // 图鉴：首次合出就解锁
       }
     }
@@ -676,6 +711,36 @@
     }
   }
 
+  /* 道具券计数与锤子按钮状态 */
+  function paintVouchers(pop) {
+    const chip = document.getElementById('voucherChip');
+    const cnt = document.getElementById('voucherCount');
+    const btn = document.getElementById('hammerBtn');
+    if (cnt) cnt.textContent = state.vouchers + '/' + VOUCHER_MAX;
+    if (chip) {
+      chip.hidden = state.vouchers <= 0;
+      if (pop && state.vouchers > 0) {
+        chip.classList.remove('pop');
+        void chip.offsetWidth;
+        chip.classList.add('pop');
+      }
+    }
+    if (btn) {
+      const can = state.vouchers > 0 && !state.over;
+      btn.disabled = !can;
+      btn.setAttribute('aria-pressed', String(state.hammerMode));
+      btn.classList.toggle('is-armed', state.hammerMode);
+    }
+  }
+
+  /* 锤子模式下的提示条 */
+  function paintHammerHint() {
+    const hint = document.getElementById('hammerHint');
+    if (!hint) return;
+    hint.hidden = !state.hammerMode;
+    if (state.hammerMode) hint.textContent = '选择一只静止的奶蛙，Esc 取消';
+  }
+
   /* 每累计 REVIVE_STEP 分，发一枚复活币 */
   function grantRevives() {
     let got = 0;
@@ -688,6 +753,111 @@
     paintRevives(true);
     state.floats.push({ x: W / 2, y: 210, text: '+1 复活币', life: 1.4, big: true });
     Sound.merge(6);
+  }
+
+  /* ---------------------------------------------------------
+   *  道具券：进度分、档位连击账本、里程碑结算
+   *
+   *  规则要点（与 PLAN Stage 4 一致）：
+   *   · voucherProgress 单调递增，只有实质得分推进它；满额 +100 不推进。
+   *   · 每 500 分一个档位。一个档位里攒够 3 次双连或 2 次三连，该档位里程碑就合格。
+   *   · 连锁要结束时才知道长度，所以「跨过里程碑」时如果还有连锁在进行，
+   *     先把它排进 pendingMilestones，等连锁结算完再逐个结算。
+   *   · 每个节点只结算一次，结算后该档位记录丢弃，绝不回头补发。
+   * ------------------------------------------------------- */
+
+  /* 某分数落在第几个档位（0 起） */
+  function bandOf(score) {
+    return Math.floor(score / VOUCHER_STEP);
+  }
+
+  function ensureBand(i) {
+    /* 防御：下标必须是 >= 0 的整数，否则退回当前进度所在的档位。
+       外部（含自检脚本）可能不带 startBand 调用，不能让这里返回 undefined。 */
+    let idx = Number(i);
+    if (!isFinite(idx) || idx < 0) idx = bandOf(state.voucherProgress);
+    idx = Math.floor(idx);
+    while (state.bandCombos.length <= idx) {
+      state.bandCombos.push({ double: 0, triple: 0, closed: false });
+    }
+    return state.bandCombos[idx];
+  }
+
+  /* 一条连锁结算时调用：把它记到「起始档位」上。
+     长度 1 不算连击；长度 2 记一次双连；长度 3+ 只记一次三连（不再记双连）。 */
+  function noteComboEvent(len, startBand) {
+    if (len < 2) return;
+    const band = ensureBand(startBand);
+    if (band.closed) return;              // 该档位已经结算过，不再计入
+    if (len === 2) band.double++;
+    else band.triple++;
+  }
+
+  /* 推进券进度分，并把新跨过的里程碑节点排队。
+     只有「实质得分」才调用这里；满额 +100 不走这条路径。 */
+  function advanceVoucherProgress(n) {
+    if (n <= 0) return;
+    state.voucherProgress += n;
+    const reached = bandOf(state.voucherProgress);
+    /* 跨过的节点：从已结算的 voucherMilestone 之后，到 reached 为止 */
+    for (let m = state.voucherMilestone + 1; m <= reached; m++) {
+      if (state.pendingMilestones.indexOf(m) < 0) state.pendingMilestones.push(m);
+    }
+    state.pendingMilestones.sort((a, b) => a - b);
+    trySettleMilestones();
+  }
+
+  /* 尝试结算排队的里程碑。
+     如果还有连锁在进行，就先等 —— 因为这条连锁最终可能正好落在这些档位上，
+     必须等它结算并归位后才能判定档位是否合格。 */
+  function trySettleMilestones() {
+    if (state.cascadeLen > 0) return;     // 等连锁结束
+    while (state.pendingMilestones.length) {
+      const m = state.pendingMilestones.shift();
+      settleMilestone(m);
+    }
+  }
+
+  /* 结算一个里程碑节点：只看「到该节点为止那个档位」的记录，结算后关闭该档位 */
+  function settleMilestone(m) {
+    if (m <= state.voucherMilestone) return;   // 已经结算过，绝不重复
+    state.voucherMilestone = m;
+
+    const bandIndex = m - 1;                   // 第 m 个节点对应第 m-1 个档位
+    const band = ensureBand(bandIndex);
+    if (band.closed) return;                   // 理论上不会发生，防御一下
+    band.closed = true;
+
+    const qualified = band.double >= COMBO_DOUBLE_NEED
+                   || band.triple >= COMBO_TRIPLE_NEED;
+    if (!qualified) return;                    // 没合格，静默关闭
+
+    if (state.vouchers < VOUCHER_MAX) {
+      state.vouchers++;
+      paintVouchers(true);
+      state.floats.push({ x: W / 2, y: 250, text: '+1 道具券', life: 1.4, big: true });
+      Sound.merge(7);
+    } else {
+      /* 满额：改发 +100 分。刻意不推进券进度、不触发新的里程碑结算。 */
+      payoutOverflow(m);
+    }
+  }
+
+  /* 满额奖励：只改可见分数与最高分，不动 voucherProgress，也不递归结算 */
+  function payoutOverflow(m) {
+    state.score += VOUCHER_OVERFLOW_SCORE;
+    if (state.score > state.best) {
+      state.best = state.score;
+      localStorage.setItem(BEST_KEY, String(state.best));
+      bestEl.textContent = state.best;
+    }
+    scoreEl.textContent = state.score;
+    bump(scoreEl);
+    state.floats.push({
+      x: W / 2, y: 250,
+      text: '道具券已满 +' + VOUCHER_OVERFLOW_SCORE, life: 1.4, big: true
+    });
+    Sound.bonus();
   }
 
   function addScore(n, x, y, text) {
@@ -703,6 +873,7 @@
       state.floats.push({ x, y, text: text || ('+' + n), life: 1 });
     }
     grantRevives();
+    advanceVoucherProgress(n);   // 实质得分 → 推进券进度
   }
 
   /* 只加分数，不走「每 1500 分发复活币」那条路。
@@ -719,7 +890,9 @@
     if (x !== undefined) {
       state.floats.push({ x, y, text: text || ('+' + n), life: 1.2 });
     }
-    /* 刻意不调用 grantRevives() */
+    /* 刻意不调用 grantRevives() —— 但这笔分仍然算「实质得分」，
+       要推进券进度（PLAN Stage 4 要求连锁奖励与救回奖励都计入券进度）。 */
+    advanceVoucherProgress(n);
   }
 
   /* ---------------------------------------------------------
@@ -738,11 +911,16 @@
   function settleCascade() {
     const len = state.cascadeLen;
     if (len <= 0) return;
+    const startBand = state.cascadeStartBand;   // 这条连锁开链时所在的档位
     state.cascadeLen = 0;
     state.cascadeBall = null;
 
+    /* 先把连击记到起始档位，再放行里程碑结算 ——
+       顺序很重要：档位记录必须在本节点结算之前就位。 */
+    noteComboEvent(len, startBand);
+
     if (len > state.stats.maxCascade) state.stats.maxCascade = len;
-    if (len < 2) return;                      // 长度 1 没有连锁奖励
+    if (len < 2) { trySettleMilestones(); return; }   // 长度 1 没有连锁奖励
 
     /* 奖励 = min(len-1, 5) × 5，最多 +25；走不攒币的加分通道 */
     const steps = Math.min(len - 1, CASCADE_BONUS_MAX);
@@ -759,23 +937,37 @@
     }
     Sound.bonus();
     haptic(30);
+
+    /* 连锁已彻底结束，此时才允许结算排队的里程碑 */
+    trySettleMilestones();
   }
 
-  /* 一次普通合成产出了 nb（新水果）。判断它是接上连锁还是另起一条。 */
-  function noteCascadeMerge(nb) {
+  /* 一次普通合成产出了 nb（新水果）。判断它是接上连锁还是另起一条。
+     startBand 是「本次合成得分入账之前」voucherProgress 所在的档位，
+     由 processMerges 在调用 addScore 之前捕获并传进来。 */
+  function noteCascadeMerge(nb, startBand) {
     const now = state.clock;
-    /* 上一条连锁产出的那颗水果，是不是刚好被这次合成吃掉了？ */
+    /* 上一条连锁产出的那颗水果，是不是刚好被这次合成吃掉了？
+       注意必须看 removedBy === 'merge'：光看 dead 会把「被锤子砸掉」
+       也当成连锁接上，那就错了。 */
     const continues = state.cascadeLen > 0
       && state.cascadeBall !== null
-      && state.cascadeBall.dead === true          // 它确实被合成了
+      && state.cascadeBall.dead === true
+      && state.cascadeBall.removedBy === 'merge'
       && (now - state.cascadeTime) <= CASCADE_WINDOW;
 
     if (continues) {
       state.cascadeLen++;
     } else {
-      /* 接不上：先把上一条结算掉，再开一条新的 */
+      /* 接不上：先把上一条结算掉，再开一条新的。
+         新链的起始档位要在「本次合成得分入账之前」取，所以调用方
+         （processMerges）会先把 startBand 存进 state.cascadeStartBand。 */
       settleCascade();
       state.cascadeLen = 1;
+      /* 没传 startBand 时（例如外部直接调用），退回当前进度所在的档位 */
+      state.cascadeStartBand = (typeof startBand === 'number' && isFinite(startBand))
+        ? startBand
+        : bandOf(state.voucherProgress);
     }
 
     state.cascadeBall = nb;
@@ -901,6 +1093,149 @@
     Sound.drop();
     drawNext();
     if (state.balls.length > 90) state.balls = state.balls.filter(b => !b.dead);
+  }
+
+  /* ---------------------------------------------------------
+   *  Stage 4：锤子（消耗一张道具券，砸掉一只静止的奶蛙）
+   *
+   *  资格：还在 state.balls 里、未 dead、landed、上一步物理有接触（contacts > 0）、
+   *        且当前速度 <= 55 px/s。接触条件用来排除「刚落地还在弹」的水果 ——
+   *        它们的 landed 一直是 true，但并没有真的停住。
+   *  命中：按旋转后的子圆判定（与碰撞体一致），重叠时取渲染顺序最上面那只。
+   * ------------------------------------------------------- */
+
+  /* 某只水果此刻能不能被砸 */
+  function isHammerTarget(b) {
+    if (!b || b.dead) return false;
+    if (state.balls.indexOf(b) < 0) return false;
+    if (!b.landed) return false;
+    if (!(b.contacts > 0)) return false;
+    const v2 = b.vx * b.vx + b.vy * b.vy;
+    return v2 <= HAMMER_REST_SPEED2;
+  }
+
+  /* 世界坐标 → 逻辑坐标 */
+  function pointerToPoint(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left) * (W / rect.width),
+      y: (clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  /* 点 (px,py) 是否落在某只水果的某个子圆内（子圆已跟着刚体旋转） */
+  function hitsFruit(b, px, py) {
+    if (!b || b.dead) return false;
+    /* 先用包围圆粗筛 */
+    const dx0 = px - b.x, dy0 = py - b.y;
+    if (dx0 * dx0 + dy0 * dy0 > b.rb * b.rb) return false;
+    for (let k = 0; k < b.parts.length; k++) {
+      const dx = px - b.wx[k], dy = py - b.wy[k];
+      const r = b.ws[k];
+      if (dx * dx + dy * dy <= r * r) return true;
+    }
+    return false;
+  }
+
+  /* 找出点击点命中的、可被砸的水果。
+     渲染顺序是「半径从小到大」，所以反过来遍历就是「从上往下」。 */
+  function pickHammerTarget(px, py) {
+    const sorted = state.balls.slice().sort((a, b) => a.r - b.r);
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const b = sorted[i];
+      if (hitsFruit(b, px, py) && isHammerTarget(b)) return b;
+    }
+    return null;
+  }
+
+  /* 点到了水果，但那只不符合条件（在飞 / 在弹 / 刚被移走） */
+  function pickAnyFruitAt(px, py) {
+    const sorted = state.balls.slice().sort((a, b) => a.r - b.r);
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const b = sorted[i];
+      if (hitsFruit(b, px, py)) return b;
+    }
+    return null;
+  }
+
+  /* 原子移除：标记 dead + 立刻从 state.balls 移除，并记下移除原因。
+     cascade 判定要求「被合成吃掉」，所以这里必须是 'hammer'，
+     否则砸掉连锁刚产出的那颗会被误判成连锁接上了。 */
+  function removeBall(b, cause) {
+    if (!b || b.dead) return false;
+    const idx = state.balls.indexOf(b);
+    if (idx < 0) return false;
+    b.dead = true;
+    b.removedBy = cause;
+    state.balls.splice(idx, 1);
+    /* 清掉可能残留的引用与计时，避免危险线/救回逻辑再碰到它 */
+    b.overTime = 0;
+    b.dangerPeak = 0;
+    b.contacts = 0;
+    if (state.cascadeBall === b) {
+      /* 连锁刚产出的那颗被砸了：不构成「被合成吃掉」，连锁到此为止 */
+      state.cascadeBall = null;
+      if (state.cascadeLen > 0) settleCascade();
+    }
+    if (state.hammerHover === b) state.hammerHover = null;
+    return true;
+  }
+
+  /* 进入/退出锤子瞄准模式 */
+  function setHammerMode(on) {
+    if (on) {
+      if (state.over || state.vouchers <= 0) return false;
+      state.hammerMode = true;
+      state.hammerHover = null;
+      Sound.ensure();
+    } else {
+      state.hammerMode = false;
+      state.hammerHover = null;
+    }
+    paintVouchers(false);
+    paintHammerHint();
+    return true;
+  }
+
+  function toggleHammerMode() {
+    if (state.hammerMode) { setHammerMode(false); return true; }
+    return setHammerMode(true);
+  }
+
+  /* 在锤子模式下处理一次点击：成功则消耗一张券并退出模式 */
+  function hammerClickAt(px, py) {
+    if (!state.hammerMode) return false;
+    if (state.over) { setHammerMode(false); return false; }
+
+    const target = pickHammerTarget(px, py);
+    if (!target) {
+      const any = pickAnyFruitAt(px, py);
+      state.floats.push({
+        x: px, y: py,
+        text: any ? '这只还在动，砸不了' : '点一只静止的奶蛙',
+        life: 1.1
+      });
+      return false;      // 不消耗、不退出
+    }
+    if (state.vouchers <= 0) { setHammerMode(false); return false; }
+
+    /* 二次校验：物理一直在跑，点到这一刻再确认一次 */
+    if (!isHammerTarget(target)) {
+      state.floats.push({ x: px, y: py, text: '这只还在动，砸不了', life: 1.1 });
+      return false;
+    }
+
+    const tx = target.x, ty = target.y, tt = target.tier;
+    if (!removeBall(target, 'hammer')) return false;   // 已被移走：不消耗
+
+    state.vouchers--;
+    paintVouchers(true);
+    burst(tx, ty, tt, 12 + tt * 2, 180 + tt * 20);
+    Sound.merge(Math.min(tt + 2, MAX_TIER));
+    haptic(20);
+    state.floats.push({ x: tx, y: ty - 20, text: '砸掉一只', life: 1.0 });
+    setHammerMode(false);          // 用完自动退出
+    return true;
   }
 
   /* ---------------------------------------------------------
@@ -1030,6 +1365,8 @@
 
   function gameOver() {
     state.over = true;
+    /* 判负时先退出锤子瞄准态，再走原有的结束/复活流程 */
+    if (state.hammerMode) setHammerMode(false);
     finalScoreEl.textContent = state.score;
     finalBestEl.textContent = state.best;
     Sound.over();
@@ -1127,6 +1464,18 @@
     state.cascadeY = 0;
     state.clock = 0;
 
+    /* 道具券清零（复活不清，重开才清） */
+    state.vouchers = 0;
+    state.voucherProgress = 0;
+    state.voucherMilestone = 0;
+    state.bandCombos = [];
+    state.pendingMilestones = [];
+    state.cascadeStartBand = 0;
+
+    /* 锤子退出瞄准态 */
+    state.hammerMode = false;
+    state.hammerHover = null;
+
     /* 局内统计清零 */
     state.stats.maxCascade = 0;
     state.stats.maxTier = 0;
@@ -1147,6 +1496,7 @@
     drawNext();
     drawChain();              // 图鉴剪影跟着重画
     paintStats();
+    paintVouchers(false);
     Sound.ensure();
   }
 
@@ -1343,6 +1693,18 @@
       }
       const shape = b.sq > 0.004 ? { a: b.sqA, k: b.sq } : null;
       drawFruit(ctx, b.x, b.y, b.r, b.tier, b.angle, scale, shape);
+
+      /* 锤子瞄准态：把可砸的目标描一圈，告诉玩家点哪儿有效 */
+      if (state.hammerMode && isHammerTarget(b)) {
+        const hot = state.hammerHover === b;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r * 1.06, 0, Math.PI * 2);
+        ctx.lineWidth = hot ? 3.4 : 2;
+        ctx.strokeStyle = hot ? 'rgba(240,80,40,.95)' : 'rgba(240,120,60,.5)';
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   }
 
@@ -1664,6 +2026,14 @@
 
   stage.addEventListener('pointermove', (e) => {
     if (state.over || isModalOpen()) return;
+
+    /* 锤子瞄准态：只更新高亮，绝不移动准星、也不投放 */
+    if (state.hammerMode) {
+      const pt = pointerToPoint(e.clientX, e.clientY);
+      state.hammerHover = pickHammerTarget(pt.x, pt.y);
+      return;
+    }
+
     if (e.pointerType === 'touch' && !touchAiming) return;
     moveAim(pointerToX(e.clientX));
     if (e.pointerType === 'touch') trackTouch(pointerToX(e.clientX));
@@ -1672,6 +2042,15 @@
   stage.addEventListener('pointerdown', (e) => {
     if (state.over || isModalOpen()) return;
     Sound.ensure();
+
+    /* 锤子瞄准态：这一下点击用于选目标，不移动准星、不投放 */
+    if (state.hammerMode) {
+      const pt = pointerToPoint(e.clientX, e.clientY);
+      hammerClickAt(pt.x, pt.y);
+      e.preventDefault();
+      return;
+    }
+
     moveAim(pointerToX(e.clientX));
     if (e.pointerType === 'touch') {
       touchAiming = true;
@@ -1691,6 +2070,7 @@
     if (!touchAiming) return;
     touchAiming = false;
     if (state.over) return;
+    if (state.hammerMode) return;      // 锤子态下松手不投放
     moveAim(pointerToX(e.clientX));
     trackTouch(pointerToX(e.clientX));
     state.finesse = finesseFromTrack();       // 松手这一下才把冲量算进去
@@ -1730,6 +2110,22 @@
   window.addEventListener('keydown', (e) => {
     if (isTyping(e)) return;
     if (isModalOpen()) return;
+
+    /* 锤子瞄准态：Esc 取消；空格/回车/方向键一律不投放 */
+    if (state.hammerMode) {
+      if (e.code === 'Escape' || e.key === 'Escape') {
+        setHammerMode(false);
+        e.preventDefault();
+        return;
+      }
+      if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowDown') {
+        e.preventDefault();            // 吃掉，不投放
+        return;
+      }
+      /* 其余按键（方向键微调、R 重开）也一并不放行，避免误操作 */
+      e.preventDefault();
+      return;
+    }
 
     /* Shift + ←/→：只调方向微调，不动瞄准位置 */
     if (FINESSE_ENABLED && e.shiftKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
@@ -1856,6 +2252,17 @@
     if (reviveWideBtn) reviveWideBtn.addEventListener('click', () => revive('wide'));
     if (giveUpBtn) giveUpBtn.addEventListener('click', settle);
 
+    /* 锤子按钮：点一下进入/退出瞄准态 */
+    const hammerBtn = document.getElementById('hammerBtn');
+    if (hammerBtn) {
+      hammerBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleHammerMode();
+      });
+    }
+    paintVouchers(false);
+    paintHammerHint();
+
     drawChain();
     reset();
     loadBlur();             // 占位图是内联的，几乎立刻可用
@@ -1876,6 +2283,13 @@
                      render, resizeCanvas, shapeOf, makeBall, paintRevives, addScore, addBonusScore,
                      settleCascade, noteCascadeMerge, breakCascade, noteTier, creditRecovery,
                      checkGameOver, askRevive,
+                     /* Stage 4 */
+                     isHammerTarget, hitsFruit, pickHammerTarget, pickAnyFruitAt,
+                     removeBall, setHammerMode, toggleHammerMode, hammerClickAt,
+                     paintVouchers, paintHammerHint, bandOf, noteComboEvent,
+                     advanceVoucherProgress, trySettleMilestones, settleMilestone,
+                     VOUCHER_STEP, VOUCHER_MAX, VOUCHER_OVERFLOW_SCORE,
+                     COMBO_DOUBLE_NEED, COMBO_TRIPLE_NEED, HAMMER_REST_SPEED,
                      unlockTier, isDiscovered, loadDiscovery, saveDiscovery, reloadDiscovery,
                      paintStats,
                      paintReviveChoices, clearForRevive, topFirstOrder, drawChain, drawSilhouette,

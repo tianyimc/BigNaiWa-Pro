@@ -390,9 +390,25 @@ body {
 
 .actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;   /* 锤子 / 音效 / 重开 一行三个 */
   gap: 10px;
 }
+
+/* 排行榜按钮独占一整行（它是主入口，和三个小按钮区分开） */
+.actions .btn-wide {
+  grid-column: 1 / -1;
+}
+
+/* 三个小按钮并排后横向空间变窄：只收紧横向内边距、禁止文字折行，
+   纵向内边距保持原样，别把按钮压扁。 */
+.actions .btn:not(.btn-wide) {
+  padding: 11px 8px;
+  white-space: nowrap;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.actions .btn:not(.btn-wide) .ico { margin-right: 3px; }
 
 .btn {
   padding: 11px 12px;
@@ -878,6 +894,82 @@ body {
   border-radius: 3px;
 }
 
+/* ---------------- 道具券与锤子（Stage 4）---------------- */
+
+/* 券计数胶囊：和复活币胶囊同款，压在它下面 */
+.voucher-chip {
+  position: absolute;
+  left: 10px;
+  top: 40px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  color: #4a3a12;
+  background: linear-gradient(135deg, #d9f0ff, #a8d8f5);
+  box-shadow: 0 3px 10px rgba(30, 110, 160, .28), inset 0 1px 0 rgba(255, 255, 255, .75);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.voucher-chip-ico { font-size: 12px; }
+
+.voucher-chip.pop { animation: revivePop .5s cubic-bezier(.2, .9, .3, 1.5); }
+
+/* 锤子瞄准态的提示条：压在棋盘顶部中间 */
+.hammer-hint {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(196, 72, 32, .92);
+  box-shadow: 0 4px 14px rgba(140, 40, 10, .35);
+  pointer-events: none;
+}
+
+/* 锤子按钮：和音效按钮同尺寸，启用时用暖色区分 */
+.btn.btn-hammer {
+  color: #7a3c00;
+  border-color: rgba(214, 140, 60, .5);
+  background: linear-gradient(135deg, #ffe0b0, #ffc078);
+}
+
+.btn.btn-hammer:hover:not(:disabled) {
+  box-shadow: 0 8px 20px rgba(230, 140, 40, .32);
+}
+
+.btn.btn-hammer:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+  filter: grayscale(.4);
+}
+
+/* 进入瞄准态：按钮高亮，表示「正在等目标」 */
+.btn.btn-hammer.is-armed {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #ff8a5c, #f4623a 60%, #d8401c);
+  box-shadow: 0 8px 20px rgba(220, 80, 40, .45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voucher-chip.pop { animation: none; }
+}
+
 /* ---------------- 参数提示 ---------------- */
 
 .tips {
@@ -999,7 +1091,7 @@ body {
   .stat {
     flex: 1 1 0;
     min-width: 0;
-    padding: 6px 10px;
+    padding: 6px 6px;
     border-radius: 12px;
     background: rgba(255, 255, 255, .9);
     box-shadow: 0 2px 8px rgba(140, 96, 56, .12);
@@ -1011,6 +1103,24 @@ body {
     letter-spacing: .04em;
     white-space: nowrap;
   }
+
+  /* 窄屏顶部信息条要放下「排行榜 / 锤子 / 音效 / 重开」四个按钮。
+     统一压成等宽的图标按钮（只留图标、隐藏文字），
+     这样不挤占分数卡片，也不会把标题行顶出去。 */
+  .actions {
+    gap: 5px;
+  }
+
+  .actions .btn {
+    min-width: 40px;
+    padding: 0 8px;
+    font-size: 16px;
+  }
+
+  /* 只有图标按钮时，把文字标签藏起来，图标居中 */
+  .actions .btn-hammer .lbl,
+  .actions .btn:not(.btn-wide) .lbl { display: none; }
+  .actions .btn .ico { margin-right: 0; }
 
   .stat-value {
     margin-top: 0;

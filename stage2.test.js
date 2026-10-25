@@ -160,7 +160,7 @@ G.noteCascadeMerge(nb1);
 eq(G.state.cascadeLen, 1, '第一次合成 → 长度 1');
 
 G.state.clock += 0.3;              // 窗口内
-nb1.dead = true;                   // 它被合成掉了
+nb1.dead = true; nb1.removedBy = 'merge';   // 它被合成掉了
 const nb2 = mkBall(210, 590, 2);
 G.state.balls.push(nb2);
 G.noteCascadeMerge(nb2);
@@ -169,7 +169,7 @@ eq(G.state.stats.maxCascade, 2, '最高连锁更新为 2');
 
 /* A4：超过窗口再接 → 不接上，重新从 1 开始 */
 G.state.clock += 0.7;              // 超出窗口
-nb2.dead = true;
+nb2.dead = true; nb2.removedBy = 'merge';
 const nb3 = mkBall(210, 580, 3);
 G.state.balls.push(nb3);
 G.noteCascadeMerge(nb3);
@@ -177,7 +177,7 @@ eq(G.state.cascadeLen, 1, '超出窗口 → 另起一条，长度回到 1');
 
 /* A5：投放打断连锁 */
 G.state.clock += 0.1;
-nb3.dead = true;
+nb3.dead = true; nb3.removedBy = 'merge';
 const nb4 = mkBall(210, 570, 4);
 G.state.balls.push(nb4);
 G.noteCascadeMerge(nb4);
@@ -223,7 +223,7 @@ G.state.balls.push(prev);
 G.noteCascadeMerge(prev);
 for (let i = 0; i < 3; i++) {
   G.state.clock += 0.2;
-  prev.dead = true;
+  prev.dead = true; prev.removedBy = 'merge';
   const nx = mkBall(210, 600 - i * 10, 2 + i);
   G.state.balls.push(nx);
   G.noteCascadeMerge(nx);
@@ -253,7 +253,7 @@ G.state.balls.push(p2);
 G.noteCascadeMerge(p2);
 for (let i = 0; i < 9; i++) {
   G.state.clock += 0.1;
-  p2.dead = true;
+  p2.dead = true; p2.removedBy = 'merge';
   const nx = mkBall(210, 600, Math.min(2 + i, G.FRUITS.length - 1));
   G.state.balls.push(nx);
   G.noteCascadeMerge(nx);
