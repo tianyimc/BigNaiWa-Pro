@@ -67,7 +67,7 @@ const BASE_IDS = ['game', 'stage', 'overlay', 'score', 'best', 'finalScore', 'fi
   'secretMsg', 'secretClose', 'secretCancel', 'hammerHint', 'shieldTimer',
   'cnt-hammer', 'cnt-magnet', 'cnt-fan', 'cnt-shield',
   'btn-hammer', 'btn-magnet', 'btn-fan', 'btn-shield',
-  'itemMenuBtn', 'itemMenu'];
+  'itemMenuBtn', 'itemMenu', 'scoreStars', 'finalStars'];
 const els = {};
 BASE_IDS.forEach((id) => { els[id] = makeEl(id); });
 els.revivePrompt.hidden = true;
@@ -714,6 +714,54 @@ ok(/\.item-menu-wrap\s*>\s*\.btn\s*\{[^}]*width:\s*100%/.test(cssText),
    '.item-menu-wrap 内的按钮宽度 100%');
 ok(/\.item-menu-wrap\s*\{[^}]*min-width:\s*0/.test(cssText),
    '.item-menu-wrap 允许收缩（min-width: 0）');
+
+/* ============================================================
+ * [O] 合成神奶蛙次数与五角星
+ *
+ * 每合成一次神奶蛙（两只神奶蛙相撞）记一次，并在分数后面加一颗星：
+ * 4 次就是 4 颗星。主分数和结算分数两处都要同步。
+ * ========================================================== */
+console.log('\n[O] 合成神奶蛙次数与五角星');
+
+G.reset();
+eq(G.state.stats.topClears, 0, '开局合成神奶蛙次数为 0');
+G.paintStars();
+eq(els.scoreStars.textContent, '', '0 次时没有星星');
+
+/* 手动记一次并刷新 */
+G.state.stats.topClears = 1;
+G.paintStars();
+eq(els.scoreStars.textContent, '⭐', '1 次 → 1 颗星');
+eq(els.finalStars.textContent, '⭐', '结算分数也显示 1 颗星');
+
+G.state.stats.topClears = 4;
+G.paintStars();
+eq(els.scoreStars.textContent, '⭐⭐⭐⭐', '4 次 → 4 颗星');
+eq(els.finalStars.textContent, '⭐⭐⭐⭐', '结算处同样是 4 颗星');
+
+/* 新局清零 */
+G.reset();
+eq(G.state.stats.topClears, 0, '新局清零');
+eq(els.scoreStars.textContent, '', '新局星星也清空');
+
+/* 真实触发一次：两只神奶蛙相撞 */
+G.reset();
+const r10 = G.FRUITS[10].r;
+const wa = G.makeBall(210, 500, 10, 0, 0); wa.landed = true; wa.py = wa.y;
+const wb = G.makeBall(210, 500 - (2 * r10 + 0.6), 10, 0, 0); wb.landed = true; wb.py = wb.y;
+G.state.balls.push(wa, wb);
+let cleared = false;
+for (let i = 0; i < 80 && !cleared; i++) {
+  G.stepPhysics(1 / 60);
+  if (G.state.balls.length === 0) cleared = true;
+}
+ok(cleared, '两只神奶蛙真的撞在一起并消失');
+eq(G.state.stats.topClears, 1, '真实触发后次数 = 1');
+eq(els.scoreStars.textContent, '⭐', '真实触发后分数后面出现 1 颗星');
+eq(G.state.score, G.MAX_BONUS, '清场得分 = MAX_BONUS');
+
+/* 奖励分已改为 800 */
+eq(G.MAX_BONUS, 800, 'MAX_BONUS 是 800');
 
 console.log('\n' + pass + ' 通过 / ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

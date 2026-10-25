@@ -189,12 +189,12 @@ for (let i = 0; i < 60 && !merged; i++) {
 }
 ok(merged, '两只神奶蛙相撞后一起消失');
 eq(G.state.score, G.MAX_BONUS, '得分正好是 MAX_BONUS');
-eq(G.MAX_BONUS, 500, 'MAX_BONUS 是 500（原来是 100）');
+eq(G.MAX_BONUS, 800, 'MAX_BONUS 是 800（原 500，owner 要求提到 800）');
 ok(G.state.freeze > 0, '触发了定格（freeze > 0）');
 ok(G.state.freeze <= 0.2, '定格时长合理（≤200ms）');
 const bigFloat = G.state.floats.filter((f) => f.big);
 eq(bigFloat.length, 1, '有且只有一个大字飘分（不会和普通飘字重复）');
-eq(bigFloat[0].text, '+500', '大字写的是 +500');
+eq(bigFloat[0].text, '+800', '大字写的是 +800');
 eq(G.state.floats.length, 2, '一共就两行飘字：大字 +500、小字说明');
 ok(G.state.floats.some((f) => f.text.indexOf('两个神奶蛙') >= 0), '还有一行「两个神奶蛙」说明文字');
 eq(G.state.revives, 1, '额外送了一枚复活币');

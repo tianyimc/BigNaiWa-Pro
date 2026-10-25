@@ -28,7 +28,7 @@
   const REST_SPEED2 = REST_SPEED * REST_SPEED;
 
   const MAX_TIER  = 10;      // 最大那只（神奶蛙）的索引
-  const MAX_BONUS = 500;     // 两只神奶蛙相撞的奖励分
+  const MAX_BONUS = 800;     // 两只神奶蛙相撞的奖励分（原 500，owner 要求提到 800）
                              // （原来是 100 —— 合出全游戏最难的东西只给 100 分，太寒酸；
                              //  而且它同时清掉两块最大的水果、相当于救一条命，值这个价）
   const MAX_MERGE_GIVES_REVIVE = true;  // 两只神奶蛙一起炸掉时，额外送一枚复活币
@@ -368,7 +368,7 @@
     stats: {
       maxCascade: 0,     // 最高连锁长度
       maxTier: 0,        // 合到过的最高等级（含投放的起始等级）
-      topClears: 0,      // 两只神奶蛙一起炸掉的次数
+      topClears: 0,      // 两只神奶蛙一起炸掉的次数（合成神奶蛙次数）
       recoveries: 0,     // 危险线救回次数
       revivesUsed: 0     // 用掉复活币的次数
     },
@@ -693,7 +693,8 @@
           state.revives++;
           paintRevives(true);
         }
-        state.stats.topClears++;              // 顶级清场统计
+        state.stats.topClears++;              // 顶级清场统计（= 合成神奶蛙次数）
+        paintStars();                         // 分数后面补一颗星
         settleCascade();                      // 不产水果 → 连锁到此为止
       } else {
         const nt = tier + 1;
@@ -1935,6 +1936,18 @@
     setText('statTop', s.topClears);
     setText('statRecovery', s.recoveries);
     setText('statRevive', s.revivesUsed);
+    paintStars();
+  }
+
+  /* 分数后面的五角星：每合成一次神奶蛙（两只神奶蛙相撞）就加一颗。
+     同时刷新到主分数和结算分数两处。 */
+  function paintStars() {
+    const n = state.stats.topClears || 0;
+    const stars = n > 0 ? new Array(n + 1).join('⭐') : '';
+    const live = document.getElementById('scoreStars');
+    if (live) live.textContent = stars;
+    const fin = document.getElementById('finalStars');
+    if (fin) fin.textContent = stars;
   }
 
   function setText(id, v) {
@@ -3060,7 +3073,7 @@
                      FAN_DURATION, FAN_ACCEL, FAN_MAX_ADDED_VX,
                      SHIELD_DURATION, SHIELD_AUTO_WINDOW,
                      unlockTier, isDiscovered, loadDiscovery, saveDiscovery, reloadDiscovery,
-                     paintStats,
+                     paintStats, paintStars,
                      paintReviveChoices, clearForRevive, topFirstOrder, drawChain, drawSilhouette,
                      finesseFromTrack,
                      MAX_BONUS, REVIVE_STEP,

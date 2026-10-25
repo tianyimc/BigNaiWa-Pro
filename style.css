@@ -636,9 +636,18 @@ body {
 
 @media (max-width: 380px) {
   .revive-choices { grid-template-columns: 1fr; }
-  .run-stats { padding: 8px 10px; gap: 5px 8px; }
-  .run-stat-label { font-size: 11px; }
-  .run-stat-value { font-size: 13px; }
+  /* 窄屏统计区：320px 放两列会把标签挤成竖排、数值被裁。
+     改成单列，每行「标签 —— 数值」，紧凑但完整。 */
+  .run-stats {
+    grid-template-columns: 1fr;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  .run-stat { gap: 8px; }
+  .run-stat-label { font-size: 11px; white-space: nowrap; }
+  .run-stat-value { font-size: 13px; overflow: visible; text-overflow: clip; }
+  /* 最后一项（用掉复活币）恢复成普通行，不再居中独占 */
+  .run-stat:last-child { grid-column: auto; justify-content: space-between; }
 }
 
 /* ---------------- 排行榜弹窗 ---------------- */
@@ -1104,6 +1113,28 @@ body {
 /* 标题是隐藏入口：保持视觉不变，但给一点点可点击的暗示 */
 #gameTitle { cursor: default; user-select: none; -webkit-user-select: none; }
 
+/* ---------------- 分数后面的五角星 ---------------- */
+
+/* 每合成一次神奶蛙（两只神奶蛙相撞）加一颗星。
+   星星紧跟在分数后面，小一号、不抢分数的视觉重量；数量多时允许换行。 */
+.score-stars {
+  display: inline-block;
+  margin-left: 3px;
+  font-size: 0.62em;
+  line-height: 1;
+  letter-spacing: -1px;
+  vertical-align: 2px;
+  white-space: normal;
+  word-break: break-all;
+  max-width: 100%;
+}
+
+/* 结算面板里的星星稍大一点，配合那里的字号 */
+.dialog-score .score-stars {
+  font-size: 0.7em;
+  vertical-align: 1px;
+}
+
 /* ---------------- 参数提示 ---------------- */
 
 .tips {
@@ -1122,7 +1153,7 @@ body {
 
 @media (max-width: 860px) {
   :root {
-    --topbar: 104px;  /* 顶部信息条（两行：分数 + 按钮）+ 间隙 */
+    --topbar: 122px;  /* 顶部信息条（分数行含星星 + 按钮行）+ 间隙 */
     --foot: 52px;     /* 页脚 + 间隙的大致占高 */
   }
 

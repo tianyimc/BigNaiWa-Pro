@@ -252,7 +252,7 @@ eq(G.FINESSE_MAX, 60, '代码里的微调上限确实是 60px/s');
 eq(G.REVIVE_COST_NORMAL, 1, '普通档确实是 1 枚');
 eq(G.REVIVE_COST_WIDE, 2, '大范围档确实是 2 枚');
 eq(G.REVIVE_WIDE_TOP, 3, '大范围档清顶上 3 颗');
-eq(G.MAX_BONUS, 500, '神奶蛙清场确实是 500 分');
+eq(G.MAX_BONUS, 800, '神奶蛙清场确实是 800 分');
 
 /* 页面上的旧提示也要改过 */
 ok(html.indexOf('每 <strong>1500 分</strong>') >= 0, '侧栏提示已改成 1500 分');
